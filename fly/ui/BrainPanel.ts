@@ -1,8 +1,8 @@
 import { Connectome } from "../brain/Connectome";
 import { maskedSoftmax } from "../brain/Readout";
-import { ACTIONS } from "../game/Motor";
+import { HEADS } from "../game/Motor";
 import { FlyDecisionTelemetry, FlyTelemetry } from "../game/Telemetry";
-import { BrainRenderer, TAG_READOUT } from "./BrainRenderer";
+import { BrainRenderer, RenderQuality, TAG_READOUT } from "./BrainRenderer";
 
 // The spectator's window into the fly: a 3D FlyWire brain replaying each
 // decision's spikes in slow motion, what the fly senses, and how strongly
@@ -22,6 +22,10 @@ export const CHANNEL_COLORS: [number, number, number][] = [
   [1.0, 0.7, 0.2], // wealth
   [0.6, 0.65, 1.0], // size
   [0.85, 0.85, 0.85], // strain
+  [0.95, 0.8, 0.45], // hoard
+  [0.3, 0.6, 0.95], // shore
+  [0.7, 0.9, 0.4], // build
+  [1.0, 0.3, 0.55], // sky
 ];
 const READOUT_COLOR: [number, number, number] = [1.0, 0.35, 0.15];
 
@@ -39,7 +43,28 @@ const SHORT: Record<string, string> = {
   wealth: "Gut",
   size: "Size",
   strain: "Effort",
+  hoard: "Reserves",
+  shore: "Shore",
+  build: "Infra",
+  sky: "Sky",
 };
+
+type Quality = RenderQuality | "off";
+const QUALITY_LABEL: Record<Quality, string> = { high: "HQ", low: "Lite", off: "Off" };
+const QUALITY_KEY = "openfly.quality";
+
+function defaultQuality(): Quality {
+  try {
+    const saved = localStorage.getItem(QUALITY_KEY);
+    if (saved === "high" || saved === "low" || saved === "off") return saved;
+  } catch {
+    // storage blocked: fall through to the hardware guess
+  }
+  const nav = navigator as Navigator & { deviceMemory?: number };
+  const weak =
+    (nav.hardwareConcurrency ?? 8) <= 4 || (nav.deviceMemory ?? 8) <= 4;
+  return weak ? "low" : "high";
+}
 
 const css = (c: [number, number, number], a = 1) =>
   `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${a})`;
@@ -92,7 +117,12 @@ export class BrainPanel {
   private replayCursor = 0;
   private lastArrival = 0;
   private senseRows: HTMLDivElement[] = [];
-  private motorRows: HTMLDivElement[] = [];
+  private headRows: HTMLDivElement[][] = [];
+  private quality: Quality = defaultQuality();
+  private qualityBtn: HTMLButtonElement;
+  private lastRender = 0;
+  private slowFrames = 0;
+  private autoLowered = false;
   private foot: HTMLDivElement;
   private log: HTMLDivElement;
   private spark: HTMLCanvasElement;
@@ -118,6 +148,7 @@ export class BrainPanel {
       <div class="of-head">
         <span>🪰</span>
         <div class="of-title">Fly brain <span class="of-status">waking up…</span><div class="of-sub">FlyWire 783 · ${c.nSim.toLocaleString()} of ${c.nAll.toLocaleString()} neurons spiking</div></div>
+        <button class="of-btn of-quality" title="3D view quality: HQ draws the whole brain, Lite only the simulated neurons at 30 fps, Off hides it">HQ</button>
         <button class="of-btn of-collapse" title="Collapse">–</button>
       </div>
       <div class="of-body">
@@ -128,7 +159,6 @@ export class BrainPanel {
         </div>
         <div class="of-sec"><span>Senses → sensory neurons (Hz)</span><span>hover for details</span></div>
         <div class="of-senses"></div>
-        <div class="of-sec"><span>Descending neurons → motor programs</span><span>vote</span></div>
         <div class="of-motor"></div>
         <canvas class="of-spark"></canvas>
         <div class="of-foot"></div>
@@ -150,10 +180,23 @@ export class BrainPanel {
       this.senseRows.push(row);
     });
     const motor = root.querySelector(".of-motor")!;
-    ACTIONS.forEach((a) => {
-      const row = this.row(`${a.label} · ${a.bio}`, css(READOUT_COLOR));
-      motor.appendChild(row);
-      this.motorRows.push(row);
+    HEADS.forEach((head) => {
+      const sec = document.createElement("div");
+      sec.className = "of-sec";
+      sec.innerHTML = `<span>Descending neurons → ${head.label.toLowerCase()}</span><span>vote</span>`;
+      motor.appendChild(sec);
+      this.headRows.push(
+        head.programs.map((a) => {
+          const row = this.row(`${a.label} · ${a.bio}`, css(READOUT_COLOR));
+          motor.appendChild(row);
+          return row;
+        }),
+      );
+    });
+    this.qualityBtn = root.querySelector<HTMLButtonElement>(".of-quality")!;
+    this.qualityBtn.addEventListener("click", () => {
+      const order: Quality[] = ["high", "low", "off"];
+      this.setQuality(order[(order.indexOf(this.quality) + 1) % order.length], true);
     });
 
     root.querySelector(".of-collapse")!.addEventListener("click", () => {
@@ -176,6 +219,7 @@ export class BrainPanel {
       for (const i of c.readout) this.renderer.tag[i] = TAG_READOUT;
       this.renderer.markTagsDirty();
       this.bindCanvas(canvas);
+      this.setQuality(this.quality, false);
     } catch (e) {
       canvas.replaceWith(
         Object.assign(document.createElement("div"), {
@@ -364,32 +408,35 @@ export class BrainPanel {
     t.senses.forEach((v, i) =>
       this.setRow(this.senseRows[i], v, `${Math.round(t.rates[i])}`),
     );
-    const mask = Uint8Array.from(t.mask);
-    const probs =
-      t.scores === null
-        ? null
-        : maskedSoftmax(Float32Array.from(t.scores), mask);
-    ACTIONS.forEach((a, i) => {
-      const row = this.motorRows[i];
-      row.classList.toggle("of-off", mask[i] === 0);
-      row.classList.toggle("of-chosen", i === t.action);
-      const p = probs === null ? (i === t.action ? 1 : 0) : probs[i];
-      this.setRow(row, p, mask[i] ? `${Math.round(100 * p)}%` : "–");
-      row.title =
-        i === t.teacherAction
-          ? "The hand-written teacher would pick this one"
-          : mask[i] === 0
-            ? "Not possible right now"
-            : "";
+    const picks: string[] = [];
+    t.heads.forEach((h, hi) => {
+      const programs = HEADS[hi].programs;
+      const mask = Uint8Array.from(h.mask);
+      const probs =
+        h.scores === null ? null : maskedSoftmax(Float32Array.from(h.scores), mask);
+      programs.forEach((_, i) => {
+        const row = this.headRows[hi][i];
+        row.classList.toggle("of-off", mask[i] === 0);
+        row.classList.toggle("of-chosen", i === h.action);
+        const p = probs === null ? (i === h.action ? 1 : 0) : probs[i];
+        this.setRow(row, p, mask[i] ? `${Math.round(100 * p)}%` : "–");
+        row.title =
+          i === h.teacher
+            ? "The hand-written teacher would pick this one"
+            : mask[i] === 0
+              ? "Not possible right now"
+              : "";
+      });
+      // Idle programs (wait, save) only make the log when both heads idle.
+      if (h.action !== 0 || hi === t.heads.length - 1 && picks.length === 0) {
+        const agree =
+          h.action === h.teacher ? "" : ` (teacher: ${programs[h.teacher].label})`;
+        picks.push(
+          `${programs[h.action].label}${h.executed ? "" : " (nothing to do)"}${agree}`,
+        );
+      }
     });
-    const a = ACTIONS[t.action];
-    const agree =
-      t.action === t.teacherAction
-        ? ""
-        : ` (teacher: ${ACTIONS[t.teacherAction].label})`;
-    this.addLog(
-      `${this.clock(t.tick)} ${a.label}${t.executed ? "" : " (nothing to do)"}${agree}`,
-    );
+    this.addLog(`${this.clock(t.tick)} ${picks.join(" + ")}`);
     this.foot.innerHTML = `${t.totalSpikes.toLocaleString()} spikes in ${t.windowMs} ms · ${t.computeMs.toFixed(0)} ms CPU · decision ${this.decisionCount} · ${t.policy === "brain" ? "brain in control" : `<span class="of-teach">${t.policy}</span>`}`;
     this.drawSpark(t);
   }
@@ -458,9 +505,47 @@ export class BrainPanel {
           this.replayCursor++;
         }
       }
-      if (!this.root.classList.contains("of-collapsed")) r.render(dt);
+      const visible =
+        this.quality !== "off" && !this.root.classList.contains("of-collapsed");
+      const minGap = this.quality === "low" ? 33 : 0;
+      if (visible && time - this.lastRender >= minGap) {
+        r.render(time - this.lastRender);
+        this.lastRender = time;
+      }
+      if (visible) this.watchFrameRate(dt);
     }
     this.raf = requestAnimationFrame((tt) => this.frame(tt));
+  }
+
+  private setQuality(q: Quality, remember: boolean): void {
+    this.quality = q;
+    this.qualityBtn.textContent = QUALITY_LABEL[q];
+    const wrap = this.root.querySelector<HTMLDivElement>(".of-canvas-wrap");
+    if (wrap !== null) wrap.style.display = q === "off" ? "none" : "";
+    if (this.renderer !== null && q !== "off") this.renderer.quality = q;
+    this.slowFrames = 0;
+    if (remember) {
+      try {
+        localStorage.setItem(QUALITY_KEY, q);
+      } catch {
+        // storage blocked: the choice lasts for this game only
+      }
+    }
+  }
+
+  /**
+   * Drop to Lite once if the page keeps running below ~25 fps with the full
+   * brain on screen (typical for integrated or software GPUs).
+   */
+  private watchFrameRate(frameMs: number): void {
+    if (this.quality !== "high" || this.autoLowered) return;
+    this.slowFrames =
+      frameMs > 40 ? this.slowFrames + 1 : Math.max(0, this.slowFrames - 2);
+    if (this.slowFrames > 75) {
+      this.autoLowered = true;
+      this.setQuality("low", false);
+      this.addLog("3D view switched to Lite to keep the game smooth");
+    }
   }
 
   dispose(): void {

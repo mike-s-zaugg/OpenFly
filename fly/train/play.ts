@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { Difficulty } from "../../openfront/src/core/game/Game";
 import { Readout, ReadoutWeights } from "../brain/Readout";
 import { FlyRegistry } from "../game/FlyRegistry";
-import { ACTIONS } from "../game/Motor";
+import { ECONOMY, MILITARY } from "../game/Motor";
 import { playHeadless } from "./HeadlessGame";
 import { loadConnectomeFromDisk } from "./NodeBrainLoader";
 
@@ -44,7 +44,8 @@ console.log(
     {
       ...res,
       actionCounts: Object.fromEntries(
-        ACTIONS.map((a, i) => [a.key, res.actionCounts[i]]),
+        [...MILITARY.map((a, i) => [a.key, res.actionCounts.military[i]]),
+         ...ECONOMY.map((a, i) => [a.key, res.actionCounts.economy[i]])],
       ),
     },
     null,

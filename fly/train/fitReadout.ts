@@ -1,10 +1,10 @@
-import { N_ACTIONS } from "../game/Motor";
-import { Dataset } from "./records";
+import { N_SENSES } from "../game/Senses";
+import { Dataset, HeadData } from "./records";
 
 // Masked multinomial logistic regression from readout-neuron activity to the
-// teacher's motor program, trained with mini-batch Adam. Only programs that
-// were feasible at that moment compete in the softmax, the same rule the fly
-// uses when it plays.
+// teacher's motor program, one per motor head, trained with mini-batch Adam.
+// Only programs that were feasible at that moment compete in the softmax, the
+// same rule the fly uses when it plays.
 
 export interface FitOptions {
   epochs: number;
@@ -28,8 +28,6 @@ export const DEFAULT_FIT: FitOptions = {
 export interface FitResult {
   W: Float32Array; // A x D
   b: Float32Array;
-  mean: Float32Array;
-  std: Float32Array;
   trainAcc: number;
   valAcc: number;
   valLoss: number;
@@ -44,30 +42,22 @@ export const countFeatures: Features = (d, r, out) => {
 };
 
 export const senseFeatures: Features = (d, r, out) => {
-  for (let j = 0; j < 13; j++) out[j] = d.senses[r * 13 + j];
+  for (let j = 0; j < N_SENSES; j++) out[j] = d.senses[r * N_SENSES + j];
 };
 
-function rng(seed: number) {
-  let s = seed >>> 0 || 1;
-  return () => {
-    s ^= s << 13;
-    s ^= s >>> 17;
-    s ^= s << 5;
-    return (s >>> 0) / 4294967296;
-  };
+export interface FeatureMatrix {
+  X: Float32Array; // n x dim, standardized with the training rows' stats
+  dim: number;
+  mean: Float32Array;
+  std: Float32Array;
 }
 
-export function fitReadout(
+export function buildFeatures(
   d: Dataset,
   train: number[],
-  val: number[],
   dim: number,
   feat: Features,
-  opt: FitOptions = DEFAULT_FIT,
-  log: (s: string) => void = () => {},
-): FitResult {
-  const A = N_ACTIONS;
-  // Materialize standardized features.
+): FeatureMatrix {
   const X = new Float32Array(d.n * dim);
   const tmp = new Float32Array(dim);
   for (let r = 0; r < d.n; r++) {
@@ -76,8 +66,9 @@ export function fitReadout(
   }
   const mean = new Float32Array(dim);
   const std = new Float32Array(dim);
-  for (const r of train)
+  for (const r of train) {
     for (let j = 0; j < dim; j++) mean[j] += X[r * dim + j];
+  }
   for (let j = 0; j < dim; j++) mean[j] /= train.length;
   for (const r of train) {
     for (let j = 0; j < dim; j++) {
@@ -91,6 +82,30 @@ export function fitReadout(
       X[r * dim + j] = std[j] > 1e-6 ? (X[r * dim + j] - mean[j]) / std[j] : 0;
     }
   }
+  return { X, dim, mean, std };
+}
+
+function rng(seed: number) {
+  let s = seed >>> 0 || 1;
+  return () => {
+    s ^= s << 13;
+    s ^= s >>> 17;
+    s ^= s << 5;
+    return (s >>> 0) / 4294967296;
+  };
+}
+
+export function fitHead(
+  fm: FeatureMatrix,
+  head: HeadData,
+  train: number[],
+  val: number[],
+  opt: FitOptions = DEFAULT_FIT,
+  log: (s: string) => void = () => {},
+): FitResult {
+  const { X, dim } = fm;
+  const A = head.nActions;
+  const d = head;
 
   const counts = new Float64Array(A);
   for (const r of train) counts[d.teacher[r]]++;
@@ -223,8 +238,6 @@ export function fitReadout(
   return {
     W,
     b,
-    mean,
-    std,
     trainAcc: tr.acc,
     valAcc: va.acc,
     valLoss: va.loss,

@@ -2,6 +2,17 @@
 // main thread). Plain data plus typed arrays, so they can be posted from the
 // game worker with their buffers transferred.
 
+export interface FlyHeadTelemetry {
+  key: "military" | "economy";
+  /** Readout scores per program (null when no readout is loaded). */
+  scores: number[] | null;
+  mask: number[];
+  action: number;
+  teacher: number;
+  /** The program found something to do when it ran. */
+  executed: boolean;
+}
+
 export interface FlyDecisionTelemetry {
   type: "openfly_decision";
   flyId: string;
@@ -15,12 +26,8 @@ export interface FlyDecisionTelemetry {
   senses: number[];
   /** Poisson rates driven onto each channel (Hz). */
   rates: number[];
-  /** Readout scores per motor program (null when no readout is loaded). */
-  scores: number[] | null;
-  mask: number[];
-  action: number;
-  teacherAction: number;
-  executed: boolean;
+  /** One entry per motor head (military, economy), in HEADS order. */
+  heads: FlyHeadTelemetry[];
   /** Spikes during the window: neuron index and step within the window. */
   spikeNeuron: Uint16Array;
   spikeStep: Uint16Array;

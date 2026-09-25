@@ -80,7 +80,7 @@ CHANNELS = [
     {
         "key": "pursuit",
         "label": "Small-object pursuit (LC10)",
-        "game": "The weakest bordering enemy is beatable",
+        "game": "Our attack stack against the best target's army (log scale)",
         "why": "LC10 neurons track small moving objects; males use them to chase a courtship target.",
         "filter": {"cell_type_regex": "^LC10"},
         "max": 240,
@@ -147,6 +147,35 @@ CHANNELS = [
         "game": "Share of our troops already out attacking",
         "why": "Ascending neurons to the posterior slope, where locomotor effort signals arrive.",
         "filter": {"cell_sub_class": ["AN_IPS_GNG", "AN_GNG_IPS", "AN_SPS_IPS", "AN_IPS_LAL"]},
+    },
+    {
+        "key": "hoard",
+        "label": "Ascending: reserves",
+        "game": "Gold in the bank, on a log scale (100k to 100M)",
+        "why": "Ascending neurons into the gnathal ganglia; a second, slower signal of stored energy.",
+        "filter": {"cell_sub_class": ["AN_GNG"]},
+        "max": 240,
+    },
+    {
+        "key": "shore",
+        "label": "Proboscis bristles",
+        "game": "Coastline without enough ports",
+        "why": "Mechanosensory bristles on the labellum, touched while foraging at the water's edge.",
+        "filter": {"cell_type": ["BM_Taste"]},
+    },
+    {
+        "key": "build",
+        "label": "Visual (LC9)",
+        "game": "Cities without enough factories and rail",
+        "why": "LC9 visual projection neurons; the fly sees its own territory lacking infrastructure.",
+        "filter": {"cell_type": ["LC9"]},
+    },
+    {
+        "key": "sky",
+        "label": "Visual (MTe01b)",
+        "game": "Nuclear threat: rival missile silos or nukes in the air",
+        "why": "MTe01b medulla tangential neurons; danger from above.",
+        "filter": {"cell_type": ["MTe01b"]},
     },
 ]
 
@@ -311,7 +340,10 @@ def main() -> None:
 
     args.out.mkdir(parents=True, exist_ok=True)
     stem = "flywire783"
-    with gzip.open(args.out / f"{stem}.bin.gz", "wb", compresslevel=9) as f:
+    # mtime=0 keeps the file byte-identical across rebuilds.
+    with open(args.out / f"{stem}.bin.gz", "wb") as raw, gzip.GzipFile(
+        fileobj=raw, mode="wb", compresslevel=9, mtime=0
+    ) as f:
         f.write(bytes(blob))
 
     meta = {

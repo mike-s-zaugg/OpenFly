@@ -1,114 +1,162 @@
+import { Player, PlayerType } from "../../openfront/src/core/game/Game";
 import { PseudoRandom } from "../../openfront/src/core/PseudoRandom";
-import { Action } from "./Motor";
-import { Situation } from "./Senses";
+import { Eco, Mil, nukeTarget } from "./Motor";
+import { Situation, wantedFactories, wantedPorts } from "./Senses";
 
 // A hand-written policy used only to train the brain's readout: the fly
 // watches these choices while its connectome processes the same senses, and
 // the readout learns to produce them from descending-neuron activity alone.
-// It plays like a sensible human: grab free land early, keep troops near the
-// growth sweet spot, turn gold into cities, punish weak neighbours, and
-// build defenses when something big is coming.
+//
+// It has two independent parts, like the fly's two motor heads, so building
+// never starves fighting: every decision picks one military program and one
+// economy/diplomacy program.
 
 export interface TeacherParams {
   expandAt: number;
+  /**
+   * Attack whenever our stack outnumbers the target by this factor and we
+   * hold at least `crushAt` of our cap. Ratio rules alone fail when cities
+   * keep raising the cap faster than troops grow.
+   */
+  crushAt: number;
+  crushRatio: number;
+  /** Attack once the stack we would send matches this share of the target. */
   attackAt: number;
-  weakRatio: number;
+  stackRatio: number;
+  /** Above this troop ratio, spend the surplus even on a costlier fight. */
+  surplusAt: number;
+  surplusStackRatio: number;
   boatAt: number;
-  citySlack: number;
+  /** Counter only attackers with fewer troops than this share of ours. */
+  retaliateRatio: number;
+  /** Gold (in atom bombs) we must hold before nuking a rival not attacking us. */
+  richNukes: number;
 }
 
 export const DEFAULT_TEACHER: TeacherParams = {
-  expandAt: 0.22,
-  attackAt: 0.5,
-  weakRatio: 0.75,
-  boatAt: 0.55,
-  citySlack: 1.0,
+  expandAt: 0.2,
+  crushAt: 0.25,
+  crushRatio: 1.0,
+  attackAt: 0.4,
+  stackRatio: 0.5,
+  surplusAt: 0.6,
+  surplusStackRatio: 0.25,
+  boatAt: 0.5,
+  retaliateRatio: 1.1,
+  richNukes: 6,
 };
 
-export function teacherAction(
+export function teacherMilitary(
   s: Situation,
   mask: Uint8Array,
-  random: PseudoRandom,
+  me: Player,
+  costs: { atom: number },
   p: TeacherParams = DEFAULT_TEACHER,
-): Action {
+): Mil {
   const r = s.troopRatio;
-  const threat = s.incomingTroops / Math.max(1, s.troops);
-  const can = (a: Action) => mask[a] === 1;
+  const t = Math.max(1, s.troops);
+  const can = (a: Mil) => mask[a] === 1;
 
-  // Danger first.
-  if (threat > 0.4 && can(Action.Defend) && s.defensePosts < 2 + s.cities) {
-    return Action.Defend;
-  }
+  // Fight back against a real attack we can match, from the surplus.
   if (
-    can(Action.Retaliate) &&
+    can(Mil.Retaliate) &&
     s.mainAttacker !== null &&
-    r > 0.3 &&
-    s.mainAttacker.troops() < 1.3 * s.troops
+    r > 0.4 &&
+    s.incomingTroops > 0.1 * t &&
+    s.mainAttacker.troops() < p.retaliateRatio * t
   ) {
-    return Action.Retaliate;
+    return Mil.Retaliate;
   }
-  if (can(Action.Ally) && s.allianceRequests.length > 0) {
-    return Action.Ally;
+  // Nukes: at whoever is attacking us hard, or, once rich, at a rival that
+  // is catching up. Nuking early just makes enemies.
+  const nt = nukeTarget(s);
+  if (can(Mil.Nuke) && nt !== null) {
+    const underFire = s.mainAttacker === nt && s.incomingTroops > 0.3 * t;
+    const rich = s.gold >= p.richNukes * costs.atom;
+    if (underFire || (rich && nt.troops() > 0.8 * t)) return Mil.Nuke;
   }
+  if (can(Mil.Expand) && r > p.expandAt) return Mil.Expand;
 
-  // Economy: gold is only useful once spent.
-  if (can(Action.City) && s.gold >= s.cityCost * p.citySlack) {
-    // Coastal empires alternate ports in for trade income.
-    if (can(Action.Port) && s.ports < 1 + Math.floor(s.cities / 2)) {
-      return Action.Port;
+  const target = can(Mil.Attack) ? s.target : null;
+  if (target !== null) {
+    if (target.type() === PlayerType.Bot) {
+      if (r > 0.3) return Mil.Attack;
+    } else {
+      const stack = s.stack;
+      const enemy = Math.max(1, target.troops());
+      if (r > p.crushAt && stack >= p.crushRatio * enemy) return Mil.Attack;
+      if (r > p.attackAt && stack >= p.stackRatio * enemy) return Mil.Attack;
+      if (r > p.surplusAt && stack >= p.surplusStackRatio * enemy) {
+        return Mil.Attack;
+      }
     }
-    return Action.City;
   }
-  if (can(Action.Port) && s.ports === 0 && s.cities >= 1) {
-    return Action.Port;
-  }
-  if (can(Action.Factory) && s.cities >= 4 && random.chance(3)) {
-    return Action.Factory;
-  }
-
-  // Growth.
-  if (can(Action.Expand) && r > p.expandAt) {
-    return Action.Expand;
-  }
-  if (can(Action.Attack) && s.bots.length > 0 && r > 0.3) {
-    return Action.Attack;
-  }
+  // Boats when there is nothing to take by land. One boat at a time.
   if (
-    can(Action.Attack) &&
-    s.weakest !== null &&
-    r > p.attackAt &&
-    s.weakest.troops() < p.weakRatio * s.troops
-  ) {
-    return Action.Attack;
-  }
-  // Boats only when there is nothing to take by land: an island, or a
-  // coast where every land neighbour is too strong. One boat at a time.
-  if (
-    can(Action.Boat) &&
+    can(Mil.Boat) &&
     s.boatsOut === 0 &&
     s.freeBorder === 0 &&
     s.bots.length === 0 &&
     (s.enemies.length === 0 ? r > p.boatAt : r > 0.85)
   ) {
-    return Action.Boat;
+    return Mil.Boat;
   }
-  // Stalemate against stronger neighbours: ask the strongest for peace once
-  // in a while, otherwise save up.
+  return Mil.Wait;
+}
+
+export function teacherEconomy(
+  s: Situation,
+  mask: Uint8Array,
+  random: PseudoRandom,
+  costs: { atom: number },
+  p: TeacherParams = DEFAULT_TEACHER,
+): Eco {
+  const can = (a: Eco) => mask[a] === 1;
+  const t = Math.max(1, s.troops);
+  const threat = s.incomingTroops / t;
+  // Keep enough for a bomb once we own a silo and have someone to aim at.
+  const reserve = s.silos > 0 && s.strongest !== null ? costs.atom : 0;
+  const afford = (cost: number) => s.gold >= cost + reserve;
+
+  if (can(Eco.Defend) && threat > 0.4 && s.defensePosts < 2 + s.cities / 2) {
+    return Eco.Defend;
+  }
   if (
-    can(Action.Ally) &&
+    can(Eco.Sam) &&
+    (s.incomingNukes > 0 || s.rivalSilos > 0) &&
+    s.sams < 1 + Math.floor(s.cities / 5)
+  ) {
+    return Eco.Sam;
+  }
+  if (
+    can(Eco.Ally) &&
+    s.allianceRequests.some((r) => r.requestor().troops() > 0.7 * t)
+  ) {
+    return Eco.Ally;
+  }
+  if (can(Eco.Port) && s.ports < wantedPorts(s) && afford(s.portCost)) {
+    return Eco.Port;
+  }
+  if (can(Eco.City) && afford(s.cityCost)) return Eco.City;
+  if (can(Eco.Factory) && s.factories < wantedFactories(s)) {
+    return Eco.Factory;
+  }
+  if (
+    can(Eco.Silo) &&
+    s.silos === 0 &&
+    s.cities >= 8 &&
     s.strongest !== null &&
-    s.strongest.troops() > 1.5 * s.troops &&
+    s.gold >= p.richNukes * costs.atom
+  ) {
+    return Eco.Silo;
+  }
+  if (
+    can(Eco.Ally) &&
+    s.strongest !== null &&
+    s.strongest.troops() > 1.5 * t &&
     random.chance(8)
   ) {
-    return Action.Ally;
+    return Eco.Ally;
   }
-  if (
-    can(Action.Defend) &&
-    r > 0.9 &&
-    s.defensePosts < s.cities &&
-    random.chance(4)
-  ) {
-    return Action.Defend;
-  }
-  return Action.Wait;
+  return Eco.Save;
 }

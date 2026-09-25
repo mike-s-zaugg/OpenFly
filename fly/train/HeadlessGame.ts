@@ -8,6 +8,7 @@ import {
   GameMapType,
   GameMode,
   GameType,
+  Nation,
   Player,
   PlayerInfo,
   PlayerType,
@@ -20,7 +21,8 @@ import { PseudoRandom } from "../../openfront/src/core/PseudoRandom";
 import { GameConfig, GameStartInfo } from "../../openfront/src/core/Schemas";
 import { simpleHash } from "../../openfront/src/core/Util";
 import { NodeGameMapLoader } from "../../openfront/tests/perf/fullgame/NodeGameMapLoader";
-import { FlyExecution, FlyOptions } from "../game/FlyExecution";
+import { NationExecution } from "../../openfront/src/core/execution/NationExecution";
+import { FlyExecution, FlyOptions, FlyPolicy } from "../game/FlyExecution";
 import { OPENFLY_ROOT } from "./NodeBrainLoader";
 
 // Runs a singleplayer FFA game in Node with the fly possessing the human
@@ -31,10 +33,16 @@ export interface HeadlessGameSpec {
   compact?: boolean;
   difficulty?: Difficulty;
   bots?: number;
+  /** OpenFront's gold multiplier option (e.g. 2 for "2x gold"). */
+  goldMultiplier?: number;
   nations?: "default" | "disabled" | number;
   seed: string;
   maxTicks: number;
-  fly: Partial<FlyOptions>;
+  /**
+   * The fly's options. policy "nation" instead lets OpenFront's own nation AI
+   * play the same slot, as a yardstick.
+   */
+  fly: Partial<Omit<FlyOptions, "policy">> & { policy?: FlyPolicy | "nation" };
 }
 
 export interface GameResult {
@@ -49,7 +57,9 @@ export interface GameResult {
   won: boolean;
   winner: string | null;
   decisions: number;
-  actionCounts: number[];
+  actionCounts: { military: number[]; economy: number[] };
+  /** Longest single-tick brain cost, ms. */
+  maxTickMs: number;
   brainMs: number;
   wallMs: number;
 }
@@ -70,6 +80,8 @@ export interface HeadlessGame {
   game: Game;
   runner: GameRunner;
   fly: FlyExecution;
+  /** The player in the fly's slot (whoever controls it). */
+  player(): Player | null;
   gameConfig: GameConfig;
   /** Runs one tick; throws if the simulation reports an error. */
   step(): void;
@@ -92,6 +104,9 @@ export async function createHeadlessGame(
     infiniteTroops: false,
     instantBuild: false,
     randomSpawn: false,
+    ...(spec.goldMultiplier !== undefined
+      ? { goldMultiplier: spec.goldMultiplier }
+      : {}),
   };
   const clientID = "FLYCLNT1";
   const gameStart: GameStartInfo = {
@@ -134,13 +149,24 @@ export async function createHeadlessGame(
     },
   );
   runner.init();
-  const fly = new FlyExecution(human, gameStart.gameID, spec.fly);
-  game.addExecution(fly);
+  const useNation = spec.fly.policy === "nation";
+  const fly = new FlyExecution(human, gameStart.gameID, {
+    ...spec.fly,
+    policy: useNation ? "teacher" : (spec.fly.policy as FlyPolicy | undefined),
+  });
+  if (useNation) {
+    game.addExecution(
+      new NationExecution(gameStart.gameID, new Nation(undefined, human)),
+    );
+  } else {
+    game.addExecution(fly);
+  }
   let turn = 0;
   return {
     game,
     runner,
     fly,
+    player: () => (game.hasPlayer(human.id) ? game.player(human.id) : null),
     gameConfig,
     step() {
       runner.addTurn({ turnNumber: turn++, intents: [] });
@@ -169,10 +195,11 @@ export async function playHeadless(
   spec: HeadlessGameSpec,
 ): Promise<GameResult> {
   const wall0 = performance.now();
-  const { game, fly, step } = await createHeadlessGame(spec);
+  const h = await createHeadlessGame(spec);
+  const { game, fly, step } = h;
 
   let peak = 0;
-  const flyPlayer = (): Player | null => fly.flyPlayer();
+  const flyPlayer = (): Player | null => h.player();
   while (game.ticks() < spec.maxTicks) {
     step();
     const me = flyPlayer();
@@ -212,7 +239,8 @@ export async function playHeadless(
     won: winner !== null && typeof winner !== "string" && winner === me,
     winner: winnerName,
     decisions: fly.decisions,
-    actionCounts: fly.actionCounts,
+    actionCounts: { military: fly.milCounts, economy: fly.ecoCounts },
+    maxTickMs: fly.maxTickMs,
     brainMs: fly.computeMsTotal,
     wallMs: performance.now() - wall0,
   };

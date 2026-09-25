@@ -12,14 +12,16 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Difficulty } from "../../openfront/src/core/game/Game";
-import { ReadoutWeights } from "../brain/Readout";
+import { ReadoutHeadWeights, ReadoutWeights } from "../brain/Readout";
 import type { FlyPolicy } from "../game/FlyExecution";
-import { ACTIONS, N_ACTIONS } from "../game/Motor";
+import { HEADS } from "../game/Motor";
+import { N_SENSES } from "../game/Senses";
 import { BatchGame, runBatch, summarize } from "./batch";
 import {
+  buildFeatures,
   countFeatures,
   DEFAULT_FIT,
-  fitReadout,
+  fitHead,
   senseFeatures,
 } from "./fitReadout";
 import { loadConnectomeFromDisk } from "./NodeBrainLoader";
@@ -59,13 +61,20 @@ async function collect(a: Map<string, string>) {
   const games: BatchGame[] = [];
   for (let i = 0; i < n; i++) {
     const map = TRAIN_MAPS[i % TRAIN_MAPS.length];
+    const lap = Math.floor(i / TRAIN_MAPS.length);
     const difficulty = [Difficulty.Easy, Difficulty.Medium, Difficulty.Hard][
-      Math.floor(i / TRAIN_MAPS.length) % 3
+      lap % 3
     ];
+    // Shift bot counts and gold per lap so a map is not always paired with
+    // the same settings.
+    const k = i + lap;
     games.push({
       map,
       difficulty,
-      bots: [60, 150, 300][i % 3],
+      bots: [60, 150, 300, 400][k % 4],
+      // Every third game is a rich one (2x gold), where building and fighting
+      // have to happen at the same time.
+      goldMultiplier: k % 3 === 2 ? 2 : undefined,
       seed: `train-r${round}-${i}`,
       maxTicks: 9000,
       policy,
@@ -108,84 +117,79 @@ function fit(a: Map<string, string>) {
   console.log(
     `${d.n} decisions from ${files.length} games (${train.length} train / ${val.length} held out)`,
   );
-  const dist = new Array<number>(N_ACTIONS).fill(0);
-  for (let i = 0; i < d.n; i++) dist[d.teacher[i]]++;
-  console.log(
-    "teacher choices: " +
-      ACTIONS.map((x, i) => `${x.key} ${dist[i]}`).join(", "),
-  );
-
-  // Reference: the same regression straight from the 13 senses, i.e. what a
-  // readout could do if the brain passed its input through untouched.
-  console.log("fitting on raw senses (reference)…");
-  const ref = fitReadout(
-    d,
-    train,
-    val,
-    13,
-    senseFeatures,
-    { ...DEFAULT_FIT, epochs: 25 },
-    console.log,
-  );
-  console.log("fitting on descending/motor neuron spike counts…");
   const opt = {
     ...DEFAULT_FIT,
     epochs: Number(a.get("epochs") ?? DEFAULT_FIT.epochs),
     l2: Number(a.get("l2") ?? DEFAULT_FIT.l2),
   };
-  const res = fitReadout(
-    d,
-    train,
-    val,
-    conn.readout.length,
-    countFeatures,
-    opt,
-    console.log,
-  );
-  const majority = Math.max(...dist) / d.n;
-  console.log(
-    `held-out accuracy: brain readout ${(100 * res.valAcc).toFixed(1)}% (train ${(100 * res.trainAcc).toFixed(1)}%), raw senses ${(100 * ref.valAcc).toFixed(1)}%, always-majority ${(100 * majority).toFixed(1)}%`,
-  );
-  res.perAction.forEach((q, i) =>
+  const senseFm = buildFeatures(d, train, N_SENSES, senseFeatures);
+  const countFm = buildFeatures(d, train, conn.readout.length, countFeatures);
+  const heads: ReadoutHeadWeights[] = [];
+  const stats: Record<string, unknown> = {};
+  HEADS.forEach((info, h) => {
+    const head = d.heads[h];
+    const dist = new Array<number>(head.nActions).fill(0);
+    for (let i = 0; i < d.n; i++) dist[head.teacher[i]]++;
     console.log(
-      `  ${ACTIONS[i].key.padEnd(10)} n=${String(q.n).padStart(5)} recall ${(100 * q.recall).toFixed(0)}%`,
-    ),
-  );
-  let active = 0;
-  for (let j = 0; j < conn.readout.length; j++) if (res.std[j] > 1e-6) active++;
-  const weights: ReadoutWeights = {
-    version: 1,
-    brain: "flywire783",
-    windowMs: 100,
-    actions: ACTIONS.map((x) => x.key),
-    neurons: Array.from(conn.readout),
-    mean: Array.from(res.mean, (v) => +v.toFixed(5)),
-    std: Array.from(res.std, (v) => +v.toFixed(5)),
-    W: Array.from({ length: N_ACTIONS }, (_, i) =>
-      Array.from(
-        res.W.subarray(i * conn.readout.length, (i + 1) * conn.readout.length),
-        (v) => +v.toFixed(5),
+      `\n${info.label}: teacher chose ` +
+        info.programs.map((x, i) => `${x.key} ${dist[i]}`).join(", "),
+    );
+    // Reference: the same regression straight from the senses, i.e. what a
+    // readout could do if the brain passed its input through untouched.
+    const ref = fitHead(senseFm, head, train, val, { ...opt, epochs: 25 });
+    const res = fitHead(countFm, head, train, val, opt, console.log);
+    const majority = Math.max(...dist) / d.n;
+    console.log(
+      `held-out accuracy: brain readout ${(100 * res.valAcc).toFixed(1)}% (train ${(100 * res.trainAcc).toFixed(1)}%), raw senses ${(100 * ref.valAcc).toFixed(1)}%, always-majority ${(100 * majority).toFixed(1)}%`,
+    );
+    res.perAction.forEach((q, i) =>
+      console.log(
+        `  ${info.programs[i].key.padEnd(10)} n=${String(q.n).padStart(5)} recall ${(100 * q.recall).toFixed(0)}%`,
       ),
-    ),
-    b: Array.from(res.b, (v) => +v.toFixed(5)),
-    training: {
-      method:
-        "behaviour cloning + DAgger from a heuristic teacher (masked softmax regression)",
-      decisions: d.n,
-      games: files.length,
+    );
+    const dim = conn.readout.length;
+    heads.push({
+      key: info.key,
+      actions: info.programs.map((x) => x.key),
+      W: Array.from({ length: head.nActions }, (_, i) =>
+        Array.from(res.W.subarray(i * dim, (i + 1) * dim), (v) => +v.toFixed(5)),
+      ),
+      b: Array.from(res.b, (v) => +v.toFixed(5)),
+    });
+    stats[info.key] = {
       heldOutAccuracy: +res.valAcc.toFixed(4),
       trainAccuracy: +res.trainAcc.toFixed(4),
       rawSenseAccuracy: +ref.valAcc.toFixed(4),
       majorityBaseline: +majority.toFixed(4),
-      readoutNeuronsThatFired: active,
       perActionRecall: Object.fromEntries(
-        res.perAction.map((q, i) => [ACTIONS[i].key, +q.recall.toFixed(3)]),
+        res.perAction.map((q, i) => [info.programs[i].key, +q.recall.toFixed(3)]),
       ),
+    };
+  });
+  let active = 0;
+  for (let j = 0; j < conn.readout.length; j++) {
+    if (countFm.std[j] > 1e-6) active++;
+  }
+  const weights: ReadoutWeights = {
+    version: 2,
+    brain: "flywire783",
+    windowMs: 100,
+    neurons: Array.from(conn.readout),
+    mean: Array.from(countFm.mean, (v) => +v.toFixed(5)),
+    std: Array.from(countFm.std, (v) => +v.toFixed(5)),
+    heads,
+    training: {
+      method:
+        "behaviour cloning + DAgger from a heuristic teacher (masked softmax regression per head)",
+      decisions: d.n,
+      games: files.length,
+      readoutNeuronsThatFired: active,
+      ...stats,
     },
   };
   fs.writeFileSync(out, JSON.stringify(weights));
   console.log(
-    `wrote ${out} (${active} of ${conn.readout.length} readout neurons fired in the data)`,
+    `\nwrote ${out} (${active} of ${conn.readout.length} readout neurons fired in the data)`,
   );
 }
 

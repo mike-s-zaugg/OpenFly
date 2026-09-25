@@ -16,9 +16,13 @@ import { Connectome } from "./Connectome";
 // self-sustaining seizure as soon as odor channels are on for more than a
 // few milliseconds, and a game brain has its senses on all the time.
 //
-// Integration is exact per step. Only neurons that are away from rest are
-// visited each step (an "active set"), so cost follows activity rather than
-// brain size. The simulator is deterministic for a given seed.
+// Integration is exact. A neuron is only integrated step by step while it is
+// "hot": refractory, or with enough voltage plus synaptic drive that it could
+// still reach threshold without further input. Every other neuron is "cold":
+// its state is left alone and caught up in one exact jump (precomputed decay
+// powers) when its next input arrives. Cost therefore follows spikes and
+// near-threshold neurons rather than brain size. The simulator is
+// deterministic for a given seed.
 
 export interface LIFParams {
   dtMs: number;
@@ -48,19 +52,28 @@ export const SHIU_PARAMS: LIFParams = {
 /** Called once per spike while recording: (step within window, neuron). */
 export type SpikeSink = (step: number, neuron: number) => void;
 
-const REST_EPS = 1e-2;
+/** Beyond this many steps without input a cold neuron has fully decayed. */
+const MAX_JUMP = 400;
 
 export class LIFBrain {
   readonly n: number;
   readonly params: LIFParams;
-  // Membrane potential relative to rest (mV) and synaptic drive (mV).
+  // Membrane potential relative to rest (mV) and synaptic drive (mV). For a
+  // cold neuron these hold the state at the start of step `last[i]`.
   readonly u: Float32Array;
   readonly g: Float32Array;
   private readonly refr: Uint8Array;
-  private readonly inActive: Uint8Array;
-  private active: Uint32Array;
-  private nActive = 0;
-  private nextActive: Uint32Array;
+  private readonly last: Int32Array;
+  private readonly hot: Uint8Array;
+  private hotList: Uint32Array;
+  private nHot = 0;
+  private nextHot: Uint32Array;
+  private readonly touchedAt: Int32Array;
+  private readonly touched: Uint32Array;
+  /** Input collected this step, added to g once per touched neuron. */
+  private readonly inbox: Float32Array;
+  /** Signed synapse counts times w_syn (mV per spike at full resource). */
+  private readonly weightMv: Float32Array;
   /** Spikes per neuron since the last resetCounts(). */
   readonly counts: Uint16Array;
   /** Poisson rate (Hz) forced onto each sensory channel. */
@@ -69,6 +82,11 @@ export class LIFBrain {
   private readonly em: number;
   private readonly es: number;
   private readonly kg: number;
+  /** tau_s / (tau_m - tau_s): u can never exceed max(u,0) + c*max(g,0). */
+  private readonly cBound: number;
+  private readonly emPow: Float32Array;
+  private readonly esPow: Float32Array;
+  private readonly kPow: Float32Array;
   private readonly refrSteps: number;
   private readonly delaySteps: number;
   private readonly wUnit: number;
@@ -103,18 +121,34 @@ export class LIFBrain {
     this.u = new Float32Array(this.n);
     this.g = new Float32Array(this.n);
     this.refr = new Uint8Array(this.n);
-    this.inActive = new Uint8Array(this.n);
-    this.active = new Uint32Array(this.n);
-    this.nextActive = new Uint32Array(this.n);
+    this.last = new Int32Array(this.n);
+    this.hot = new Uint8Array(this.n);
+    this.hotList = new Uint32Array(this.n);
+    this.nextHot = new Uint32Array(this.n);
+    this.touchedAt = new Int32Array(this.n).fill(-1);
+    this.touched = new Uint32Array(this.n);
+    this.inbox = new Float32Array(this.n);
     this.counts = new Uint16Array(this.n);
     this.channelRates = new Float32Array(connectome.channelNeurons.length);
 
     this.em = Math.exp(-p.dtMs / p.tauMemMs);
     this.es = Math.exp(-p.dtMs / p.tauSynMs);
-    this.kg = (p.tauSynMs / (p.tauMemMs - p.tauSynMs)) * (this.em - this.es);
+    this.cBound = p.tauSynMs / (p.tauMemMs - p.tauSynMs);
+    this.kg = this.cBound * (this.em - this.es);
+    this.emPow = new Float32Array(MAX_JUMP + 1);
+    this.esPow = new Float32Array(MAX_JUMP + 1);
+    this.kPow = new Float32Array(MAX_JUMP + 1);
+    for (let d = 0; d <= MAX_JUMP; d++) {
+      const em = Math.pow(this.em, d);
+      const es = Math.pow(this.es, d);
+      this.emPow[d] = em;
+      this.esPow[d] = es;
+      this.kPow[d] = this.cBound * (em - es);
+    }
     this.refrSteps = Math.max(1, Math.round(p.refractoryMs / p.dtMs));
     this.delaySteps = Math.max(1, Math.round(p.delayMs / p.dtMs));
     this.wUnit = p.wSynMv * gain;
+    this.weightMv = Float32Array.from(connectome.weight, (w) => w * this.wUnit);
 
     this.res = new Float32Array(this.n).fill(1);
     // Sensory channel neurons carry an already rate-coded signal; they do
@@ -140,8 +174,9 @@ export class LIFBrain {
     return this.totalSteps;
   }
 
+  /** Neurons currently integrated step by step. */
   get activeCount(): number {
-    return this.nActive;
+    return this.nHot;
   }
 
   setChannelRate(channel: number, hz: number): void {
@@ -157,8 +192,10 @@ export class LIFBrain {
     this.u.fill(0);
     this.g.fill(0);
     this.refr.fill(0);
-    this.inActive.fill(0);
-    this.nActive = 0;
+    this.last.fill(this.totalSteps);
+    this.hot.fill(0);
+    this.nHot = 0;
+    this.touchedAt.fill(-1);
     this.ringLen.fill(0);
     this.counts.fill(0);
     this.res.fill(1);
@@ -187,16 +224,35 @@ export class LIFBrain {
     return this.rng / 4294967296;
   }
 
-  private activate(i: number): void {
-    if (this.inActive[i] === 0) {
-      this.inActive[i] = 1;
-      this.active[this.nActive++] = i;
+  /** Bring a cold neuron's state forward to the start of step `now`. */
+  private catchUp(i: number, now: number): void {
+    const d = now - this.last[i];
+    if (d > 0) {
+      if (d > MAX_JUMP) {
+        this.u[i] = 0;
+        this.g[i] = 0;
+      } else {
+        const gi = this.g[i];
+        this.u[i] = this.u[i] * this.emPow[d] + gi * this.kPow[d];
+        this.g[i] = gi * this.esPow[d];
+      }
+    }
+    this.last[i] = now;
+  }
+
+  private makeHot(i: number): void {
+    if (this.hot[i] === 0) {
+      this.hot[i] = 1;
+      this.hotList[this.nHot++] = i;
     }
   }
 
-  /** Advance the brain by `steps` integration steps. */
-  run(steps: number, sink?: SpikeSink): void {
-    for (let s = 0; s < steps; s++) this.step(s, sink);
+  /**
+   * Advance the brain by `steps` integration steps. `stepOffset` numbers the
+   * steps for the spike sink when one window is simulated in several calls.
+   */
+  run(steps: number, sink?: SpikeSink, stepOffset = 0): void {
+    for (let s = 0; s < steps; s++) this.step(stepOffset + s, sink);
   }
 
   /** Advance by a duration in milliseconds; returns the number of steps. */
@@ -207,12 +263,15 @@ export class LIFBrain {
   }
 
   private step(localStep: number, sink?: SpikeSink): void {
-    const { u, g, refr, counts } = this;
+    const { u, g, refr, counts, hot, last, touchedAt, touched, inbox } = this;
     const c = this.connectome;
     const rowptr = c.rowptr;
     const col = c.col;
-    const weight = c.weight;
-    const wUnit = this.wUnit;
+    const weight = this.weightMv;
+    const now = this.totalSteps;
+    const th = this.params.thresholdMv;
+    const cb = this.cBound;
+    let nTouched = 0;
 
     // 1. Deliver spikes emitted delaySteps ago.
     const ringSize = this.delaySteps + 1;
@@ -222,18 +281,24 @@ export class LIFBrain {
     const nDue = this.ringLen[deliverSlot];
     for (let k = 0; k < nDue; k++) {
       const pre = due[k];
-      const w = wUnit * dueEff[k];
+      const eff = dueEff[k];
       const end = rowptr[pre + 1];
       for (let e = rowptr[pre]; e < end; e++) {
         const post = col[e];
-        g[post] += weight[e] * w;
-        if (this.inActive[post] === 0) {
-          this.inActive[post] = 1;
-          this.active[this.nActive++] = post;
+        inbox[post] += weight[e] * eff;
+        if (touchedAt[post] !== now) {
+          touchedAt[post] = now;
+          touched[nTouched++] = post;
         }
       }
     }
     this.ringLen[deliverSlot] = 0;
+    for (let k = 0; k < nTouched; k++) {
+      const i = touched[k];
+      if (hot[i] === 0) this.catchUp(i, now);
+      g[i] += inbox[i];
+      inbox[i] = 0;
+    }
 
     // The slot just freed receives this step's spikes.
     this.ringHead = deliverSlot;
@@ -241,7 +306,6 @@ export class LIFBrain {
     const outEff = this.ringEff[deliverSlot];
     let nOut = 0;
     const stdU = this.stdU;
-    const now = this.totalSteps;
 
     // 2. Sensory drive: Poisson spikes forced onto channel neurons.
     const dtS = this.params.dtMs / 1000;
@@ -254,23 +318,33 @@ export class LIFBrain {
         if (this.rand() < p) {
           const i = list[k];
           if (refr[i] === 0) {
+            if (hot[i] === 0) this.catchUp(i, now);
             // Mark as spiking by pushing u over threshold; handled below.
-            u[i] = this.params.thresholdMv + 1;
-            this.activate(i);
+            u[i] = th + 1;
+            this.makeHot(i);
           }
         }
       }
     }
 
-    // 3. Integrate the active set.
+    // 3. Cold neurons that just got input join the hot set if they could
+    //    now reach threshold on their own.
+    for (let k = 0; k < nTouched; k++) {
+      const i = touched[k];
+      if (hot[i] !== 0) continue;
+      const ui = u[i];
+      const gi = g[i];
+      if ((ui > 0 ? ui : 0) + (gi > 0 ? cb * gi : 0) > th) this.makeHot(i);
+    }
+
+    // 4. Integrate the hot set.
     const em = this.em;
     const es = this.es;
     const kg = this.kg;
-    const th = this.params.thresholdMv;
-    const act = this.active;
-    const nxt = this.nextActive;
+    const act = this.hotList;
+    const nxt = this.nextHot;
     let nNext = 0;
-    for (let k = 0; k < this.nActive; k++) {
+    for (let k = 0; k < this.nHot; k++) {
       const i = act[k];
       if (refr[i] > 0) {
         refr[i]--;
@@ -298,24 +372,20 @@ export class LIFBrain {
         continue;
       }
       u[i] = ui;
-      if (
-        ui < REST_EPS &&
-        ui > -REST_EPS &&
-        g[i] < REST_EPS &&
-        g[i] > -REST_EPS
-      ) {
-        u[i] = 0;
-        g[i] = 0;
-        this.inActive[i] = 0;
-      } else {
+      const gn = g[i];
+      if ((ui > 0 ? ui : 0) + (gn > 0 ? cb * gn : 0) > th) {
         nxt[nNext++] = i;
+      } else {
+        // Cannot fire without new input: go cold, state valid from next step.
+        hot[i] = 0;
+        last[i] = now + 1;
       }
     }
     this.ringLen[deliverSlot] = nOut;
     this.totalSpikes += nOut;
-    this.active = nxt;
-    this.nextActive = act;
-    this.nActive = nNext;
+    this.hotList = nxt;
+    this.nextHot = act;
+    this.nHot = nNext;
     this.totalSteps++;
   }
 }

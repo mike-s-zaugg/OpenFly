@@ -5,7 +5,6 @@ import fs from "node:fs";
 import { Readout, ReadoutWeights } from "../brain/Readout";
 import { FlyRecord } from "../game/FlyExecution";
 import { FlyRegistry } from "../game/FlyRegistry";
-import { N_ACTIONS } from "../game/Motor";
 import { HeadlessGameSpec, playHeadless } from "./HeadlessGame";
 import { loadConnectomeFromDisk } from "./NodeBrainLoader";
 import { RECORD_BYTES, writeRecord } from "./records";
@@ -46,5 +45,5 @@ if (spec.recordPath !== undefined) {
   fs.writeFileSync(spec.recordPath, Buffer.concat(chunks));
 }
 process.stdout.write(
-  `RESULT ${JSON.stringify({ ...result, records: chunks.length, nActions: N_ACTIONS })}\n`,
+  `RESULT ${JSON.stringify({ ...result, records: chunks.length })}\n`,
 );

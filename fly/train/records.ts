@@ -1,21 +1,17 @@
 import { FlyRecord } from "../game/FlyExecution";
-import { N_ACTIONS } from "../game/Motor";
+import { N_ECO, N_MIL } from "../game/Motor";
+import { N_SENSES } from "../game/Senses";
 
 // Fixed-size binary decision records written during data collection:
-//   senses f32[13] | troopRatio f32 | landShare f32 | tick u32 |
-//   mask u8[N_ACTIONS] | teacher u8 | action u8 | counts u16[nReadout]
+//   senses f32[N_SENSES] | troopRatio f32 | landShare f32 | tick u32 |
+//   milMask u8[N_MIL] | ecoMask u8[N_ECO] |
+//   milTeacher u8 | ecoTeacher u8 | milAction u8 | ecoAction u8 |
+//   (pad to even) | counts u16[nReadout]
 
-const N_SENSES = 13;
+const HEADER = N_SENSES * 4 + 12 + N_MIL + N_ECO + 4;
+const PAD = HEADER % 2;
 
-export const RECORD_BYTES = (nReadout: number) =>
-  N_SENSES * 4 +
-  4 +
-  4 +
-  4 +
-  N_ACTIONS +
-  2 +
-  nReadout * 2 +
-  ((N_ACTIONS + 2) % 2 === 1 ? 1 : 0);
+export const RECORD_BYTES = (nReadout: number) => HEADER + PAD + nReadout * 2;
 
 export function writeRecord(
   buf: Buffer,
@@ -30,54 +26,73 @@ export function writeRecord(
   o += 4;
   buf.writeUInt32LE(rec.tick, o);
   o += 4;
-  for (let a = 0; a < N_ACTIONS; a++) buf.writeUInt8(rec.mask[a], o++);
-  buf.writeUInt8(rec.teacher, o++);
-  buf.writeUInt8(rec.action, o++);
-  if (o % 2 === 1) o++;
-  for (let j = 0; j < nReadout; j++, o += 2)
+  for (let a = 0; a < N_MIL; a++) buf.writeUInt8(rec.milMask[a], o++);
+  for (let a = 0; a < N_ECO; a++) buf.writeUInt8(rec.ecoMask[a], o++);
+  buf.writeUInt8(rec.milTeacher, o++);
+  buf.writeUInt8(rec.ecoTeacher, o++);
+  buf.writeUInt8(rec.milAction, o++);
+  buf.writeUInt8(rec.ecoAction, o++);
+  o += PAD;
+  for (let j = 0; j < nReadout; j++, o += 2) {
     buf.writeUInt16LE(rec.readoutCounts[j], o);
+  }
+}
+
+/** Labels and feasibility masks of one motor head. */
+export interface HeadData {
+  nActions: number;
+  mask: Uint8Array; // n x nActions
+  teacher: Uint8Array;
+  action: Uint8Array;
 }
 
 export interface Dataset {
   n: number;
   nReadout: number;
-  senses: Float32Array; // n x 13
-  mask: Uint8Array; // n x A
-  teacher: Uint8Array;
-  action: Uint8Array;
+  senses: Float32Array; // n x N_SENSES
   counts: Uint16Array; // n x nReadout
   tick: Uint32Array;
+  heads: [HeadData, HeadData]; // military, economy
 }
 
 export function readRecords(bufs: Buffer[], nReadout: number): Dataset {
   const size = RECORD_BYTES(nReadout);
   const n = bufs.reduce((a, b) => a + Math.floor(b.length / size), 0);
+  const head = (nActions: number): HeadData => ({
+    nActions,
+    mask: new Uint8Array(n * nActions),
+    teacher: new Uint8Array(n),
+    action: new Uint8Array(n),
+  });
   const d: Dataset = {
     n,
     nReadout,
     senses: new Float32Array(n * N_SENSES),
-    mask: new Uint8Array(n * N_ACTIONS),
-    teacher: new Uint8Array(n),
-    action: new Uint8Array(n),
     counts: new Uint16Array(n * nReadout),
     tick: new Uint32Array(n),
+    heads: [head(N_MIL), head(N_ECO)],
   };
+  const [mil, eco] = d.heads;
   let r = 0;
   for (const buf of bufs) {
     for (let base = 0; base + size <= buf.length; base += size, r++) {
       let o = base;
-      for (let i = 0; i < N_SENSES; i++, o += 4)
+      for (let i = 0; i < N_SENSES; i++, o += 4) {
         d.senses[r * N_SENSES + i] = buf.readFloatLE(o);
+      }
       o += 8;
       d.tick[r] = buf.readUInt32LE(o);
       o += 4;
-      for (let a = 0; a < N_ACTIONS; a++)
-        d.mask[r * N_ACTIONS + a] = buf.readUInt8(o++);
-      d.teacher[r] = buf.readUInt8(o++);
-      d.action[r] = buf.readUInt8(o++);
-      if ((o - base) % 2 === 1) o++;
-      for (let j = 0; j < nReadout; j++, o += 2)
+      for (let a = 0; a < N_MIL; a++) mil.mask[r * N_MIL + a] = buf.readUInt8(o++);
+      for (let a = 0; a < N_ECO; a++) eco.mask[r * N_ECO + a] = buf.readUInt8(o++);
+      mil.teacher[r] = buf.readUInt8(o++);
+      eco.teacher[r] = buf.readUInt8(o++);
+      mil.action[r] = buf.readUInt8(o++);
+      eco.action[r] = buf.readUInt8(o++);
+      o += PAD;
+      for (let j = 0; j < nReadout; j++, o += 2) {
         d.counts[r * nReadout + j] = buf.readUInt16LE(o);
+      }
     }
   }
   return d;

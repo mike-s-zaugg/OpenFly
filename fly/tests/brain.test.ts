@@ -93,25 +93,32 @@ describe("readout", () => {
     expect(p.reduce((a, x) => a + x, 0)).toBeCloseTo(1, 5);
   });
 
-  it("scores spike counts linearly", () => {
+  it("scores spike counts linearly, one score vector per head", () => {
     const r = new Readout({
-      version: 1,
+      version: 2,
       brain: "test",
       windowMs: 100,
-      actions: ["a", "b"],
       neurons: [0, 1],
       mean: [0, 0],
       std: [1, 1],
-      W: [
-        [1, 0],
-        [0, 1],
+      heads: [
+        {
+          key: "military",
+          actions: ["a", "b"],
+          W: [
+            [1, 0],
+            [0, 1],
+          ],
+          b: [0, 0.1],
+        },
+        { key: "economy", actions: ["c"], W: [[2, 0]], b: [1] },
       ],
-      b: [0, 0.1],
     });
     const counts = new Uint16Array(4);
     counts[0] = 9;
-    const s = r.scores(counts);
-    expect(s[0]).toBeCloseTo(Math.log(10), 5);
-    expect(s[1]).toBeCloseTo(0.1, 5);
+    const [mil, eco] = r.scores(counts);
+    expect(mil[0]).toBeCloseTo(Math.log(10), 5);
+    expect(mil[1]).toBeCloseTo(0.1, 5);
+    expect(eco[0]).toBeCloseTo(1 + 2 * Math.log(10), 5);
   });
 });

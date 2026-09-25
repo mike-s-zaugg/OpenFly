@@ -27,11 +27,29 @@ export const HELDOUT_MAPS = [
 
 export function suite(
   name: string,
-  policy: FlyPolicy,
+  policy: FlyPolicy | "nation",
   readoutPath: string | undefined,
   prefix: string,
 ): BatchGame[] {
   const games: BatchGame[] = [];
+  if (name === "tune") {
+    // Medium nations, normal and 2x gold: where the fly used to stall.
+    for (const map of ["world", "pangaea", "britanniaclassic", "eastasia", "europe", "africa"]) {
+      for (const gold of [undefined, 2]) {
+        games.push({
+          map,
+          difficulty: Difficulty.Medium,
+          bots: 300,
+          goldMultiplier: gold,
+          seed: `${prefix}-${map}-${gold ?? 1}`,
+          maxTicks: 12000,
+          policy,
+          readoutPath,
+        });
+      }
+    }
+    return games;
+  }
   if (name === "heldout") {
     for (const map of HELDOUT_MAPS) {
       for (const difficulty of [Difficulty.Easy, Difficulty.Medium]) {
@@ -74,13 +92,17 @@ async function main() {
   for (let i = 2; i < process.argv.length; i += 2) {
     args.set(process.argv[i].replace(/^--/, ""), process.argv[i + 1]);
   }
-  const policy = (args.get("policy") ?? "brain") as FlyPolicy;
+  const policy = (args.get("policy") ?? "brain") as FlyPolicy | "nation";
   const games = suite(
     args.get("suite") ?? "standard",
     policy,
     args.get("readout"),
     args.get("seed-prefix") ?? "eval",
   );
+  if (args.has("teacher")) {
+    const tp = JSON.parse(args.get("teacher")!) as Record<string, number>;
+    for (const g of games) g.teacherParams = tp;
+  }
   console.log(`evaluating ${policy} on ${games.length} games`);
   const results = await runBatch(
     games,

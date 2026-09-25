@@ -12,14 +12,16 @@ export interface BatchGame {
   map: string;
   difficulty: Difficulty;
   bots: number;
+  goldMultiplier?: number;
   seed: string;
   maxTicks: number;
   compact?: boolean;
-  policy: FlyPolicy;
+  policy: FlyPolicy | "nation";
   daggerBeta?: number;
   temperature?: number;
   readoutPath?: string;
   recordPath?: string;
+  teacherParams?: Record<string, number>;
 }
 
 export type BatchResult = GameResult & { records: number; spec: BatchGame };
@@ -39,6 +41,7 @@ export async function runBatch(
         map: g.map,
         difficulty: g.difficulty,
         bots: g.bots,
+        goldMultiplier: g.goldMultiplier,
         seed: g.seed,
         maxTicks: g.maxTicks,
         compact: g.compact,
@@ -48,6 +51,7 @@ export async function runBatch(
           policy: g.policy,
           daggerBeta: g.daggerBeta ?? 0.5,
           temperature: g.temperature ?? 0,
+          teacherParams: g.teacherParams,
         },
       };
       const child = spawn(

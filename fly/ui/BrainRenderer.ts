@@ -13,7 +13,7 @@ layout(location=3) in float aTag;
 uniform mat4 uMVP;
 uniform float uScale;
 uniform vec3 uClassColor[10];
-uniform vec3 uTagColor[16];
+uniform vec3 uTagColor[24];
 out vec3 vColor;
 out float vAlpha;
 void main() {
@@ -56,7 +56,13 @@ export const CLASS_COLORS: [number, number, number][] = [
   [0.22, 0.27, 0.4], // optic
 ];
 
-export const TAG_READOUT = 15;
+export const TAG_READOUT = 23;
+
+/**
+ * high: whole brain incl. optic lobes at full resolution.
+ * low: simulated neurons only, 1x resolution (for integrated GPUs).
+ */
+export type RenderQuality = "high" | "low";
 
 type Mat4 = Float32Array;
 
@@ -116,6 +122,7 @@ export class BrainRenderer {
   pitch = 0.12;
   zoom = 1.9;
   autoRotate = true;
+  quality: RenderQuality = "high";
   private gl: WebGL2RenderingContext;
   private prog: WebGLProgram;
   private heatBuf: WebGLBuffer;
@@ -200,8 +207,8 @@ export class BrainRenderer {
   }
 
   setTagColors(colors: [number, number, number][]): void {
-    const flat = new Float32Array(16 * 3);
-    colors.slice(0, 16).forEach((col, i) => flat.set(col, i * 3));
+    const flat = new Float32Array(24 * 3);
+    colors.slice(0, 24).forEach((col, i) => flat.set(col, i * 3));
     this.gl.useProgram(this.prog);
     this.gl.uniform3fv(
       this.gl.getUniformLocation(this.prog, "uTagColor"),
@@ -215,7 +222,8 @@ export class BrainRenderer {
 
   render(dtMs: number): void {
     const gl = this.gl;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr =
+      this.quality === "low" ? 1 : Math.min(2, window.devicePixelRatio || 1);
     const w = Math.max(1, Math.round(this.canvas.clientWidth * dpr));
     const h = Math.max(1, Math.round(this.canvas.clientHeight * dpr));
     if (this.canvas.width !== w || this.canvas.height !== h) {
@@ -245,7 +253,9 @@ export class BrainRenderer {
       this.tagDirty = false;
     }
     // Optic lobes first (dim background), then the simulated brain on top.
-    gl.drawArrays(gl.POINTS, this.c.nSim, this.c.nAll - this.c.nSim);
+    if (this.quality === "high") {
+      gl.drawArrays(gl.POINTS, this.c.nSim, this.c.nAll - this.c.nSim);
+    }
     gl.drawArrays(gl.POINTS, 0, this.c.nSim);
     gl.bindVertexArray(null);
   }

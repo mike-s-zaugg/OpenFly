@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { FlyRegistry } from "../game/FlyRegistry";
-import { N_ACTIONS } from "../game/Motor";
+import { N_ECO, N_MIL } from "../game/Motor";
+import { N_SENSES } from "../game/Senses";
 import { FlyDecisionTelemetry, FlyTelemetry } from "../game/Telemetry";
 import { playHeadless } from "../train/HeadlessGame";
 import { loadConnectomeFromDisk } from "../train/NodeBrainLoader";
@@ -25,6 +26,9 @@ describe("a fly in a real game", () => {
     FlyRegistry.setTelemetrySink(null);
 
     expect(res.alive).toBe(true);
+    // Each window is spread over several ticks, so no tick pays for a whole
+    // 100 ms of brain time (about 40-80 ms of CPU in one go).
+    expect(res.maxTickMs).toBeLessThan(res.brainMs / Math.max(1, res.decisions));
     expect(res.decisions).toBeGreaterThan(20);
     expect(res.landShare).toBeGreaterThan(0);
     expect(
@@ -36,9 +40,13 @@ describe("a fly in a real game", () => {
     );
     expect(decisions.length).toBe(res.decisions);
     const last = decisions[decisions.length - 1];
-    expect(last.senses).toHaveLength(13);
-    expect(last.mask).toHaveLength(N_ACTIONS);
-    expect(last.mask[0]).toBe(1);
+    expect(last.senses).toHaveLength(N_SENSES);
+    expect(last.heads.map((h) => h.key)).toEqual(["military", "economy"]);
+    expect(last.heads[0].mask).toHaveLength(N_MIL);
+    expect(last.heads[1].mask).toHaveLength(N_ECO);
+    // Waiting and saving are always possible.
+    expect(last.heads[0].mask[0]).toBe(1);
+    expect(last.heads[1].mask[0]).toBe(1);
     // The brain was actually running: spikes were recorded in the window.
     expect(decisions.some((d) => d.totalSpikes > 0)).toBe(true);
     for (const d of decisions) {
@@ -46,7 +54,7 @@ describe("a fly in a real game", () => {
         expect(v).toBeGreaterThanOrEqual(0);
         expect(v).toBeLessThanOrEqual(1);
       }
-      expect(d.mask[d.action]).toBe(1);
+      for (const h of d.heads) expect(h.mask[h.action]).toBe(1);
     }
   });
 });
