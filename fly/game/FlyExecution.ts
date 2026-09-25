@@ -85,6 +85,7 @@ export class FlyExecution implements Execution {
   private spawnRequestedAt = -1;
   private decisionPhase = 0;
   private reportedSpawn = false;
+  private reportedWin = false;
   options: FlyOptions;
 
   private senseBuf = new Float32Array(13);
@@ -152,6 +153,10 @@ export class FlyExecution implements Execution {
       this.status("spawned");
     }
     if (this.mg.inSpawnPhase()) return;
+    if (!this.reportedWin && this.mg.getWinner() === me) {
+      this.reportedWin = true;
+      this.status("won");
+    }
     if (!me.isAlive()) {
       this.status("died");
       this.active = false;
@@ -348,6 +353,7 @@ export class FlyExecution implements Execution {
     this.decisionPhase = s.decisionPhase;
     this.spawnRequestedAt = s.spawnRequestedAt;
     this.reportedSpawn = s.reportedSpawn;
+    this.reportedWin = false;
     this.decisions = 0;
     this.actionCounts = new Array<number>(N_ACTIONS).fill(0);
     this.spikeNeuron = new Uint16Array(1 << 15);

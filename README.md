@@ -68,6 +68,8 @@ Every 1.5 s of game time the fly makes one decision:
 
 ### The viewer
 
+<img src="docs/panel.png" alt="the brain panel" width="390" align="right">
+
 The 3D view draws every FlyWire neuron at its real position. Optic lobes are a dim outline (they are not simulated);
 simulated neurons flash when they spike, in the color of their sensory channel, orange for descending neurons and
 pale yellow for everything in between. Each 100 ms decision window is replayed in slow motion until the next
@@ -95,18 +97,31 @@ through the connectome.
 
 ### Results
 
-Benchmark: 24 singleplayer free-for-all games (Pangaea, World, Britannia Classic, East Asia, Italia, Four Islands;
-Easy and Medium nations; 150 bot tribes; 2 seeds each), stopped after 15 minutes of game time. "Won" means reaching
-80% of the land before that.
+Two benchmarks, all singleplayer free-for-all with 150 bot tribes, stopped after 15 minutes of game time. "Won"
+means reaching 80% of the land before that.
+
+**Training maps, new seeds** (Pangaea, World, Britannia Classic, East Asia, Italia, Four Islands; Easy and Medium
+nations; 2 seeds each, 24 games):
 
 | Player | Easy: won | Easy: top 3 | Medium: won | Medium: top 3 | Survived | Mean land at the end |
 | --- | --- | --- | --- | --- | --- | --- |
 | Teacher (hand-written) | 8 / 12 | 11 / 12 | 3 / 12 | 9 / 12 | 22 / 24 | 52.3% |
 | Fly brain, behaviour cloning only | 7 / 12 | 11 / 12 | 1 / 12 | 10 / 12 | 22 / 24 | 51.3% |
-| Fly brain, after one DAgger round | 8 / 12 | 11 / 12 | 2 / 12 | 12 / 12 | 24 / 24 | 57.3% |
+| **Fly brain, one DAgger round (shipped)** | 8 / 12 | 11 / 12 | 2 / 12 | 12 / 12 | 24 / 24 | 57.3% |
+| Fly brain, two DAgger rounds | 6 / 12 | 11 / 12 | 2 / 12 | 10 / 12 | 22 / 24 | 53.0% |
 
-After DAgger the fly beats its teacher: against Medium nations it finished in the top three in every game and held
-48.5% of the land on average after 15 minutes, against 35.7% for the teacher. Per-game results are in
+**Maps never used in training** (Africa, North America, Japan, Balkans, MENA, Australia; Easy and Medium; 12 games):
+
+| Player | Won | Top 3 | Survived | Mean land at the end |
+| --- | --- | --- | --- | --- |
+| Teacher (hand-written) | 4 / 12 | 12 / 12 | 12 / 12 | 57.3% |
+| **Fly brain, one DAgger round (shipped)** | 4 / 12 | 9 / 12 | 11 / 12 | 47.7% |
+| Fly brain, two DAgger rounds | 3 / 12 | 11 / 12 | 11 / 12 | 49.4% |
+
+In short: the fly plays about as well as its teacher. It beats Easy nations most of the time and usually finishes
+in the top three against Medium ones. On the maps it trained on it outperformed the teacher (top three in every
+Medium game, 48.5% of the land against the teacher's 35.7%); on unseen maps it falls a little behind it. Across all
+36 games it won 14 to the teacher's 15, with the same mean land share (54%). Per-game results are in
 `fly/train/results/benchmark.json`.
 
 Imitation accuracy on held-out games is 86.7% from descending/motor neuron spikes. The same regression on the 13
@@ -114,8 +129,10 @@ raw game signals reaches 83.0%, and always answering "wait" 48.6%. The readout d
 the game directly: the connectome's nonlinear processing turns the teacher's threshold rules into something a
 linear readout can pick up. 730 of the 1,413 readout neurons fired at least once in the training data.
 
-Where it struggles: island maps (it takes its own island and then ferries troops too timidly), and Hard nations,
-which usually overrun it (the teacher has the same weakness).
+Where it struggles: island maps (it takes its own island and then ferries troops too timidly), Hard nations, which
+usually overrun it (the teacher has the same weakness), and ports (the teacher's port rule depends on how many ports
+it already has, which the fly cannot sense, so it builds fewer of them). Getting clearly better than the teacher
+needs a better teacher or reinforcement learning on top of the imitation, both of which fit into `fly/train/`.
 
 ## Repository layout
 

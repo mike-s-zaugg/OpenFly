@@ -1,6 +1,6 @@
 // Evaluate a fly policy over a fixed suite of singleplayer games.
 //   npx tsx ../fly/train/evaluate.ts --policy brain --readout ../brain/readout.json
-//     [--suite quick|standard] [--out results.json] [--seed-prefix eval]
+//     [--suite quick|standard|heldout] [--out results.json] [--seed-prefix eval]
 import fs from "node:fs";
 import { Difficulty } from "../../openfront/src/core/game/Game";
 import type { FlyPolicy } from "../game/FlyExecution";
@@ -15,6 +15,16 @@ export const EVAL_MAPS = [
   "fourislands",
 ];
 
+/** Maps never used for training, to check the fly generalizes. */
+export const HELDOUT_MAPS = [
+  "africa",
+  "northamerica",
+  "japan",
+  "balkans",
+  "mena",
+  "australia",
+];
+
 export function suite(
   name: string,
   policy: FlyPolicy,
@@ -22,6 +32,22 @@ export function suite(
   prefix: string,
 ): BatchGame[] {
   const games: BatchGame[] = [];
+  if (name === "heldout") {
+    for (const map of HELDOUT_MAPS) {
+      for (const difficulty of [Difficulty.Easy, Difficulty.Medium]) {
+        games.push({
+          map,
+          difficulty,
+          bots: 150,
+          seed: `${prefix}-${map}-${difficulty}`,
+          maxTicks: 9000,
+          policy,
+          readoutPath,
+        });
+      }
+    }
+    return games;
+  }
   const diffs =
     name === "quick" ? [Difficulty.Easy] : [Difficulty.Easy, Difficulty.Medium];
   const seeds = name === "quick" ? 1 : 2;

@@ -34,6 +34,9 @@ export function openflyNationExecutions(
       ? new FlyExecution(nation.playerInfo, gameID, {
           policy: cfg.policy ?? "brain",
           telemetry: i === 0,
+          // Land at once: in singleplayer the spawn phase ends as soon as
+          // the human picks a spot.
+          spawnDelayTicks: 0,
         })
       : new NationExecution(gameID, nation),
   );
