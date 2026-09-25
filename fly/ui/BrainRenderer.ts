@@ -60,7 +60,12 @@ export const TAG_READOUT = 15;
 
 type Mat4 = Float32Array;
 
-function perspective(fovy: number, aspect: number, near: number, far: number): Mat4 {
+function perspective(
+  fovy: number,
+  aspect: number,
+  near: number,
+  far: number,
+): Mat4 {
   const f = 1 / Math.tan(fovy / 2);
   const m = new Float32Array(16);
   m[0] = f / aspect;
@@ -109,7 +114,7 @@ export class BrainRenderer {
   readonly tag: Float32Array;
   yaw = 0;
   pitch = 0.12;
-  zoom = 1;
+  zoom = 1.9;
   autoRotate = true;
   private gl: WebGL2RenderingContext;
   private prog: WebGLProgram;
@@ -126,7 +131,10 @@ export class BrainRenderer {
     private canvas: HTMLCanvasElement,
     private c: Connectome,
   ) {
-    const gl = canvas.getContext("webgl2", { antialias: false, premultipliedAlpha: true });
+    const gl = canvas.getContext("webgl2", {
+      antialias: false,
+      premultipliedAlpha: true,
+    });
     if (gl === null) throw new Error("WebGL2 unavailable");
     this.gl = gl;
     this.heat = new Float32Array(c.nAll);
@@ -163,7 +171,12 @@ export class BrainRenderer {
 
     this.vao = gl.createVertexArray()!;
     gl.bindVertexArray(this.vao);
-    const attr = (loc: number, data: Float32Array, size: number, usage: number) => {
+    const attr = (
+      loc: number,
+      data: Float32Array,
+      size: number,
+      usage: number,
+    ) => {
       const b = gl.createBuffer()!;
       gl.bindBuffer(gl.ARRAY_BUFFER, b);
       gl.bufferData(gl.ARRAY_BUFFER, data, usage);
@@ -180,14 +193,20 @@ export class BrainRenderer {
     gl.useProgram(prog);
     this.uMVP = gl.getUniformLocation(prog, "uMVP")!;
     this.uScale = gl.getUniformLocation(prog, "uScale")!;
-    gl.uniform3fv(gl.getUniformLocation(prog, "uClassColor"), CLASS_COLORS.flat());
+    gl.uniform3fv(
+      gl.getUniformLocation(prog, "uClassColor"),
+      CLASS_COLORS.flat(),
+    );
   }
 
   setTagColors(colors: [number, number, number][]): void {
     const flat = new Float32Array(16 * 3);
     colors.slice(0, 16).forEach((col, i) => flat.set(col, i * 3));
     this.gl.useProgram(this.prog);
-    this.gl.uniform3fv(this.gl.getUniformLocation(this.prog, "uTagColor"), flat);
+    this.gl.uniform3fv(
+      this.gl.getUniformLocation(this.prog, "uTagColor"),
+      flat,
+    );
   }
 
   markTagsDirty(): void {

@@ -35,7 +35,7 @@ for (let ch = 0; ch < c.channelNeurons.length; ch++) {
 // Mixed drive: all channels at random levels, several windows back to back.
 brain.reset();
 let rng = 7;
-const rand = () => ((rng = (rng * 1103515245 + 12345) >>> 0) / 4294967296);
+const rand = () => (rng = (rng * 1103515245 + 12345) >>> 0) / 4294967296;
 const t0 = performance.now();
 const windows = 20;
 let dnActiveSum = 0;

@@ -43,7 +43,10 @@ export function openflyNationExecutions(
  * In "spectate" mode the fly possesses the local human's player: the HUD,
  * the camera and the leaderboard all follow it while the human watches.
  */
-export function openflyExtraExecutions(game: Game, gameID: string): Execution[] {
+export function openflyExtraExecutions(
+  game: Game,
+  gameID: string,
+): Execution[] {
   const cfg = openflyConfig(game);
   if (cfg?.mode !== "spectate" || !FlyRegistry.hasConnectome()) return [];
   const human = game.allPlayers().find((p) => p.type() === PlayerType.Human);

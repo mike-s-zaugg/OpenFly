@@ -60,4 +60,6 @@ for (let a = 0; a < nCh; a++)
       n++;
     }
   }
-console.log(`mean pairwise cosine of channel readout profiles: ${(sim / n).toFixed(3)}`);
+console.log(
+  `mean pairwise cosine of channel readout profiles: ${(sim / n).toFixed(3)}`,
+);

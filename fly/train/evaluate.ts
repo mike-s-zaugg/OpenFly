@@ -56,10 +56,13 @@ async function main() {
     args.get("seed-prefix") ?? "eval",
   );
   console.log(`evaluating ${policy} on ${games.length} games`);
-  const results = await runBatch(games, Number(args.get("jobs") ?? 4), (r, d, t) =>
-    console.log(
-      `[${d}/${t}] ${r.map} ${r.spec.difficulty}: ${r.won ? "WON" : r.alive ? "alive" : "dead"} rank ${r.rank}/${r.players} land ${(100 * r.landShare).toFixed(1)}% (peak ${(100 * r.peakLandShare).toFixed(1)}%) ${Math.round(r.wallMs / 1000)}s`,
-    ),
+  const results = await runBatch(
+    games,
+    Number(args.get("jobs") ?? 4),
+    (r, d, t) =>
+      console.log(
+        `[${d}/${t}] ${r.map} ${r.spec.difficulty}: ${r.won ? "WON" : r.alive ? "alive" : "dead"} rank ${r.rank}/${r.players} land ${(100 * r.landShare).toFixed(1)}% (peak ${(100 * r.peakLandShare).toFixed(1)}%) ${Math.round(r.wallMs / 1000)}s`,
+      ),
   );
   console.log(summarize(results));
   for (const diff of [Difficulty.Easy, Difficulty.Medium]) {

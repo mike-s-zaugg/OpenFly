@@ -76,7 +76,8 @@ export function fitReadout(
   }
   const mean = new Float32Array(dim);
   const std = new Float32Array(dim);
-  for (const r of train) for (let j = 0; j < dim; j++) mean[j] += X[r * dim + j];
+  for (const r of train)
+    for (let j = 0; j < dim; j++) mean[j] += X[r * dim + j];
   for (let j = 0; j < dim; j++) mean[j] /= train.length;
   for (const r of train) {
     for (let j = 0; j < dim; j++) {
@@ -101,7 +102,8 @@ export function fitReadout(
   const W = new Float32Array(A * dim);
   const b = new Float32Array(A);
   // Start from the log prior so the untrained model already predicts the base rates.
-  for (let a = 0; a < A; a++) b[a] = Math.log((counts[a] + 1) / (train.length + A));
+  for (let a = 0; a < A; a++)
+    b[a] = Math.log((counts[a] + 1) / (train.length + A));
   const mW = new Float32Array(W.length);
   const vW = new Float32Array(W.length);
   const mb = new Float32Array(A);
@@ -189,7 +191,8 @@ export function fitReadout(
         }
       }
       step++;
-      const lrT = (opt.lr * Math.sqrt(1 - Math.pow(b2, step))) / (1 - Math.pow(b1, step));
+      const lrT =
+        (opt.lr * Math.sqrt(1 - Math.pow(b2, step))) / (1 - Math.pow(b1, step));
       for (let i = 0; i < W.length; i++) {
         const g = gW[i] / wsum + opt.l2 * W[i];
         mW[i] = b1 * mW[i] + (1 - b1) * g;
@@ -204,9 +207,12 @@ export function fitReadout(
       }
     }
     const ev = evaluate(val);
-    if (ev.loss < best.loss) best = { W: W.slice(), b: b.slice(), loss: ev.loss, epoch };
+    if (ev.loss < best.loss)
+      best = { W: W.slice(), b: b.slice(), loss: ev.loss, epoch };
     if (epoch % 5 === 4 || epoch === opt.epochs - 1) {
-      log(`  epoch ${epoch + 1}: val loss ${ev.loss.toFixed(3)} acc ${(100 * ev.acc).toFixed(1)}%`);
+      log(
+        `  epoch ${epoch + 1}: val loss ${ev.loss.toFixed(3)} acc ${(100 * ev.acc).toFixed(1)}%`,
+      );
     }
   }
   W.set(best.W);

@@ -102,7 +102,12 @@ export function teacherAction(
   ) {
     return Action.Ally;
   }
-  if (can(Action.Defend) && r > 0.9 && s.defensePosts < s.cities && random.chance(4)) {
+  if (
+    can(Action.Defend) &&
+    r > 0.9 &&
+    s.defensePosts < s.cities &&
+    random.chance(4)
+  ) {
     return Action.Defend;
   }
   return Action.Wait;

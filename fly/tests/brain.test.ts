@@ -60,9 +60,11 @@ describe("LIF brain", () => {
 
   it("falls quiet again once the senses go quiet (no runaway loops)", () => {
     const b = new LIFBrain(c, 3);
-    for (let ch = 0; ch < c.channelNeurons.length; ch++) b.setChannelRate(ch, 120);
+    for (let ch = 0; ch < c.channelNeurons.length; ch++)
+      b.setChannelRate(ch, 120);
     b.runMs(400);
-    for (let ch = 0; ch < c.channelNeurons.length; ch++) b.setChannelRate(ch, 0);
+    for (let ch = 0; ch < c.channelNeurons.length; ch++)
+      b.setChannelRate(ch, 0);
     b.runMs(300);
     const before = b.totalSpikes;
     b.runMs(100);

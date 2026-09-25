@@ -13,7 +13,9 @@ export function isOpenflyTelemetry(message: unknown): message is FlyTelemetry {
 
 export function dispatchOpenflyTelemetry(message: FlyTelemetry): void {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent<FlyTelemetry>(OPENFLY_EVENT, { detail: message }));
+  window.dispatchEvent(
+    new CustomEvent<FlyTelemetry>(OPENFLY_EVENT, { detail: message }),
+  );
 }
 
 export function onOpenflyTelemetry(fn: (t: FlyTelemetry) => void): () => void {

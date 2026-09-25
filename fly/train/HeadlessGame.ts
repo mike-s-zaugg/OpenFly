@@ -75,7 +75,9 @@ export interface HeadlessGame {
   step(): void;
 }
 
-export async function createHeadlessGame(spec: HeadlessGameSpec): Promise<HeadlessGame> {
+export async function createHeadlessGame(
+  spec: HeadlessGameSpec,
+): Promise<HeadlessGame> {
   const gameConfig: GameConfig = {
     gameMap: resolveMap(spec.map),
     gameMapSize: spec.compact ? GameMapSize.Compact : GameMapSize.Normal,
@@ -144,7 +146,9 @@ export async function createHeadlessGame(spec: HeadlessGameSpec): Promise<Headle
       runner.addTurn({ turnNumber: turn++, intents: [] });
       const ok = runner.executeNextTick();
       if (!ok || fatal !== null) {
-        throw new Error(`game ${spec.seed} errored at tick ${game.ticks()}: ${fatal}`);
+        throw new Error(
+          `game ${spec.seed} errored at tick ${game.ticks()}: ${fatal}`,
+        );
       }
     },
   };
@@ -152,10 +156,18 @@ export async function createHeadlessGame(spec: HeadlessGameSpec): Promise<Headle
 
 export function loadHeadlessTerrain(gameConfig: GameConfig) {
   // A fresh, unshared copy: the game mutates its maps.
-  return loadTerrainMap(gameConfig.gameMap, gameConfig.gameMapSize, mapLoader, false, true);
+  return loadTerrainMap(
+    gameConfig.gameMap,
+    gameConfig.gameMapSize,
+    mapLoader,
+    false,
+    true,
+  );
 }
 
-export async function playHeadless(spec: HeadlessGameSpec): Promise<GameResult> {
+export async function playHeadless(
+  spec: HeadlessGameSpec,
+): Promise<GameResult> {
   const wall0 = performance.now();
   const { game, fly, step } = await createHeadlessGame(spec);
 
@@ -178,16 +190,22 @@ export async function playHeadless(spec: HeadlessGameSpec): Promise<GameResult> 
     .players()
     .filter((p) => p.isAlive())
     .sort((a, b) => b.numTilesOwned() - a.numTilesOwned());
-  const rank = me !== null && alive ? ranked.indexOf(me) + 1 : ranked.length + 1;
+  const rank =
+    me !== null && alive ? ranked.indexOf(me) + 1 : ranked.length + 1;
   const winner = game.getWinner();
   const winnerName =
-    winner === null ? null : typeof winner === "string" ? winner : winner.name();
+    winner === null
+      ? null
+      : typeof winner === "string"
+        ? winner
+        : winner.name();
   return {
     seed: spec.seed,
     map: spec.map,
     ticks: game.ticks(),
     alive,
-    landShare: me === null ? 0 : me.numTilesOwned() / Math.max(1, game.totalLandTiles()),
+    landShare:
+      me === null ? 0 : me.numTilesOwned() / Math.max(1, game.totalLandTiles()),
     peakLandShare: peak,
     rank,
     players: ranked.length + (alive ? 0 : 1),

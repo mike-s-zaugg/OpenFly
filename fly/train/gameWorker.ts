@@ -25,7 +25,9 @@ const conn = loadConnectomeFromDisk();
 FlyRegistry.setConnectome(conn);
 if (spec.readoutPath) {
   FlyRegistry.setReadout(
-    new Readout(JSON.parse(fs.readFileSync(spec.readoutPath, "utf8")) as ReadoutWeights),
+    new Readout(
+      JSON.parse(fs.readFileSync(spec.readoutPath, "utf8")) as ReadoutWeights,
+    ),
   );
 }
 

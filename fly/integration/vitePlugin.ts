@@ -9,7 +9,10 @@ import type { Plugin } from "vite";
 //  - serves the brain files (../brain) at /openfly/ in dev and copies them
 //    into the build output.
 
-const OPENFLY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const OPENFLY_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 const BRAIN_DIR = path.join(OPENFLY_ROOT, "brain");
 
 export function openflyPlugin(): Plugin {
@@ -37,7 +40,9 @@ export function openflyPlugin(): Plugin {
         // Raw bytes: the worker gunzips .gz itself.
         res.setHeader(
           "Content-Type",
-          rel.endsWith(".json") ? "application/json" : "application/octet-stream",
+          rel.endsWith(".json")
+            ? "application/json"
+            : "application/octet-stream",
         );
         res.setHeader("Cache-Control", "no-cache");
         fs.createReadStream(file).pipe(res);

@@ -9,20 +9,20 @@ import {
 import { TileRef } from "../../openfront/src/core/game/GameMap";
 import { PseudoRandom } from "../../openfront/src/core/PseudoRandom";
 import {
-  PlayerInfoSchema,
   playerInfoData,
+  PlayerInfoSchema,
   readPlayerInfo,
 } from "../../openfront/src/core/snapshot/CommonSchemas";
 import { execSnapshotType } from "../../openfront/src/core/snapshot/ExecutionSnapshot";
-import { zRandom } from "../../openfront/src/core/snapshot/SnapshotType";
 import type {
   ExecRecord,
   SnapshotReader,
   SnapshotWriter,
 } from "../../openfront/src/core/snapshot/SnapshotContext";
+import { zRandom } from "../../openfront/src/core/snapshot/SnapshotType";
 import { simpleHash } from "../../openfront/src/core/Util";
 import { LIFBrain } from "../brain/LIFBrain";
-import { maskedArgmax, maskedSoftmax, Readout } from "../brain/Readout";
+import { maskedArgmax, maskedSoftmax } from "../brain/Readout";
 import { FlyRegistry } from "./FlyRegistry";
 import { Action, Motor, N_ACTIONS } from "./Motor";
 import { senses, survey } from "./Senses";
@@ -227,7 +227,8 @@ export class FlyExecution implements Execution {
         action = teacher;
         break;
       case "dagger":
-        action = this.random.next() < this.options.daggerBeta ? teacher : brainPick();
+        action =
+          this.random.next() < this.options.daggerBeta ? teacher : brainPick();
         break;
       case "brain":
       default:
@@ -368,7 +369,9 @@ export class FlyExecution implements Execution {
           )
         : null;
       this.motor =
-        this.player === null ? null : new Motor(this.mg, this.player, this.random);
+        this.player === null
+          ? null
+          : new Motor(this.mg, this.player, this.random);
       if (this.brain === null) this.active = false;
     } else {
       this.player = null;
@@ -402,7 +405,8 @@ export function chooseSpawnTile(
     const x = random.nextInt(0, g.width());
     const y = random.nextInt(0, g.height());
     const t = g.ref(x, y);
-    if (!g.isLand(t) || g.hasOwner(t) || g.isBorder(t) || g.isImpassable(t)) continue;
+    if (!g.isLand(t) || g.hasOwner(t) || g.isBorder(t) || g.isImpassable(t))
+      continue;
     let nearest = Infinity;
     for (const o of others) nearest = Math.min(nearest, g.manhattanDist(o, t));
     if (nearest < minDist) continue;
@@ -421,7 +425,8 @@ export function chooseSpawnTile(
         if (g.isLand(st) && !g.hasOwner(st) && !g.isImpassable(st)) free++;
       }
     }
-    const score = free / total + Math.min(nearest, 300) / 600 + 0.05 * random.next();
+    const score =
+      free / total + Math.min(nearest, 300) / 600 + 0.05 * random.next();
     if (score > bestScore) {
       bestScore = score;
       best = t;

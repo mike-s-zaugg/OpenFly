@@ -1,8 +1,8 @@
 import { AllianceRequestExecution } from "../../openfront/src/core/execution/alliance/AllianceRequestExecution";
 import { AttackExecution } from "../../openfront/src/core/execution/AttackExecution";
 import { ConstructionExecution } from "../../openfront/src/core/execution/ConstructionExecution";
-import { TransportShipExecution } from "../../openfront/src/core/execution/TransportShipExecution";
 import { randTerritoryTileArray } from "../../openfront/src/core/execution/nation/NationUtils";
+import { TransportShipExecution } from "../../openfront/src/core/execution/TransportShipExecution";
 import { closestTwoTiles } from "../../openfront/src/core/execution/Util";
 import {
   Game,
@@ -40,16 +40,56 @@ export const ACTIONS: {
   label: string;
   bio: string;
 }[] = [
-  { action: Action.Wait, key: "wait", label: "Wait", bio: "rest, let troops grow" },
-  { action: Action.Expand, key: "expand", label: "Expand", bio: "feed on free land" },
-  { action: Action.Attack, key: "attack", label: "Attack", bio: "pursue weak prey" },
-  { action: Action.Retaliate, key: "retaliate", label: "Counter", bio: "fight back" },
-  { action: Action.Boat, key: "boat", label: "Boat", bio: "take off over water" },
+  {
+    action: Action.Wait,
+    key: "wait",
+    label: "Wait",
+    bio: "rest, let troops grow",
+  },
+  {
+    action: Action.Expand,
+    key: "expand",
+    label: "Expand",
+    bio: "feed on free land",
+  },
+  {
+    action: Action.Attack,
+    key: "attack",
+    label: "Attack",
+    bio: "pursue weak prey",
+  },
+  {
+    action: Action.Retaliate,
+    key: "retaliate",
+    label: "Counter",
+    bio: "fight back",
+  },
+  {
+    action: Action.Boat,
+    key: "boat",
+    label: "Boat",
+    bio: "take off over water",
+  },
   { action: Action.City, key: "city", label: "City", bio: "grow the body" },
   { action: Action.Port, key: "port", label: "Port", bio: "forage by sea" },
-  { action: Action.Defend, key: "defend", label: "Defend", bio: "brace for impact" },
-  { action: Action.Ally, key: "ally", label: "Ally", bio: "answer a courtship song" },
-  { action: Action.Factory, key: "factory", label: "Factory", bio: "store energy" },
+  {
+    action: Action.Defend,
+    key: "defend",
+    label: "Defend",
+    bio: "brace for impact",
+  },
+  {
+    action: Action.Ally,
+    key: "ally",
+    label: "Ally",
+    bio: "answer a courtship song",
+  },
+  {
+    action: Action.Factory,
+    key: "factory",
+    label: "Factory",
+    bio: "store energy",
+  },
 ];
 export const N_ACTIONS = ACTIONS.length;
 
@@ -71,7 +111,9 @@ export class Motor {
     out[Action.Attack] =
       t > 100 && s.enemies.some((e) => this.me.canAttackPlayer(e)) ? 1 : 0;
     out[Action.Retaliate] =
-      s.mainAttacker !== null && t > 100 && this.me.canAttackPlayer(s.mainAttacker)
+      s.mainAttacker !== null &&
+      t > 100 &&
+      this.me.canAttackPlayer(s.mainAttacker)
         ? 1
         : 0;
     out[Action.Boat] =
@@ -79,7 +121,8 @@ export class Motor {
     out[Action.City] = s.gold >= s.cityCost ? 1 : 0;
     out[Action.Port] = s.gold >= s.portCost && s.shoreTiles.length > 0 ? 1 : 0;
     out[Action.Defend] =
-      s.gold >= s.defenseCost && (s.mainAttacker !== null || s.strongest !== null)
+      s.gold >= s.defenseCost &&
+      (s.mainAttacker !== null || s.strongest !== null)
         ? 1
         : 0;
     out[Action.Ally] =
@@ -90,7 +133,12 @@ export class Motor {
         : 0;
     const factoryCost = this.game.config().isUnitDisabled(UnitType.Factory)
       ? Number.POSITIVE_INFINITY
-      : Number(this.game.config().unitInfo(UnitType.Factory).cost(this.game, this.me));
+      : Number(
+          this.game
+            .config()
+            .unitInfo(UnitType.Factory)
+            .cost(this.game, this.me),
+        );
     out[Action.Factory] = s.gold >= factoryCost && s.cities >= 2 ? 1 : 0;
     return out;
   }
@@ -218,7 +266,10 @@ export class Motor {
         } else {
           if (this.me.isFriendly(owner)) continue;
           if (owner.troops() > 0.6 * s.troops) continue;
-          score = owner.type() === PlayerType.Bot ? 1.5 : 1 - owner.troops() / s.troops;
+          score =
+            owner.type() === PlayerType.Bot
+              ? 1.5
+              : 1 - owner.troops() / s.troops;
         }
         score -= r / 300;
         if (score > bestScore) {
@@ -301,7 +352,12 @@ export class Motor {
     for (let i = 0; i < 6; i++) {
       const t = front[this.random.nextInt(0, front.length)];
       if (
-        g.hasUnitNearby(t, g.config().defensePostRange(), UnitType.DefensePost, this.me.id())
+        g.hasUnitNearby(
+          t,
+          g.config().defensePostRange(),
+          UnitType.DefensePost,
+          this.me.id(),
+        )
       ) {
         continue;
       }
@@ -316,11 +372,17 @@ export class Motor {
       const other = req.requestor();
       // Accept anyone who is not so weak that we would rather eat them.
       if (other.troops() > 0.4 * s.troops) {
-        this.game.addExecution(new AllianceRequestExecution(this.me, other.id()));
+        this.game.addExecution(
+          new AllianceRequestExecution(this.me, other.id()),
+        );
         did = true;
       }
     }
-    if (!did && s.strongest !== null && this.me.canSendAllianceRequest(s.strongest)) {
+    if (
+      !did &&
+      s.strongest !== null &&
+      this.me.canSendAllianceRequest(s.strongest)
+    ) {
       this.game.addExecution(
         new AllianceRequestExecution(this.me, s.strongest.id()),
       );

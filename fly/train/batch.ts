@@ -65,26 +65,34 @@ export async function runBatch(
       child.on("close", (code) => {
         const line = out.split("\n").find((l) => l.startsWith("RESULT "));
         if (code !== 0 || line === undefined) {
-          reject(new Error(`game ${g.seed} failed (${code}): ${err.slice(-2000)}`));
+          reject(
+            new Error(`game ${g.seed} failed (${code}): ${err.slice(-2000)}`),
+          );
           return;
         }
-        resolve({ ...(JSON.parse(line.slice(7)) as GameResult & { records: number }), spec: g });
+        resolve({
+          ...(JSON.parse(line.slice(7)) as GameResult & { records: number }),
+          spec: g,
+        });
       });
     });
-  const lanes = Array.from({ length: Math.min(concurrency, games.length) }, async () => {
-    while (next < games.length) {
-      const g = games[next++];
-      try {
-        const r = await runOne(g);
-        results.push(r);
-        done++;
-        onDone?.(r, done, games.length);
-      } catch (e) {
-        done++;
-        console.error(String(e));
+  const lanes = Array.from(
+    { length: Math.min(concurrency, games.length) },
+    async () => {
+      while (next < games.length) {
+        const g = games[next++];
+        try {
+          const r = await runOne(g);
+          results.push(r);
+          done++;
+          onDone?.(r, done, games.length);
+        } catch (e) {
+          done++;
+          console.error(String(e));
+        }
       }
-    }
-  });
+    },
+  );
   await Promise.all(lanes);
   return results;
 }

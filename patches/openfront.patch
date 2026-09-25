@@ -12,17 +12,15 @@ index a06cb5f..5de29a0 100644
      "sign_in_for_achievements": "Sign in for achievements",
      "toggle_achievements": "Toggle achievements"
 diff --git a/src/client/ClientGameRunner.ts b/src/client/ClientGameRunner.ts
-index cc2a967..966367a 100644
+index cc2a967..74bb047 100644
 --- a/src/client/ClientGameRunner.ts
 +++ b/src/client/ClientGameRunner.ts
-@@ -91,6 +91,7 @@ import { audioMixer, initAudioMixer } from "./sound/AudioMixer";
- import { SoundManager } from "./sound/SoundManager";
- import { themeProvider } from "./theme/ThemeProvider";
- import { GameView, PlayerView } from "./view";
+@@ -1,4 +1,5 @@
+ import { Config } from "src/core/configuration/Config";
 +import { openflyMountClient } from "../../../fly/integration/client";
- 
- export interface LobbyConfig {
-   cosmetics: PlayerCosmeticRefs;
+ import { ClientEnv } from "../client/ClientEnv";
+ import { reloadForUpdate, translateText } from "../client/Utils";
+ import { EventBus } from "../core/EventBus";
 @@ -921,6 +922,7 @@ export class ClientGameRunner {
  
    private lastTickReceiveTime: number = 0;
@@ -74,6 +72,23 @@ index f4e94d6..3bf9298 100644
      const players: PlayerRecord[] = [
        {
          persistentID: getPersistentID(),
+diff --git a/src/client/Main.ts b/src/client/Main.ts
+index cadd791..9432d5b 100644
+--- a/src/client/Main.ts
++++ b/src/client/Main.ts
+@@ -1478,7 +1478,11 @@ class Client {
+         verified: resolvedName.verified,
+       }),
+       turnstileToken: await this.getTurnstileToken(lobby),
+-      playerName: resolvedName.name,
++      // OpenFly spectate: the local slot belongs to the fly.
++      playerName:
++        lobby.gameStartInfo?.config.openfly?.mode === "spectate"
++          ? "Fly"
++          : resolvedName.name,
+       playerClanTag: this.usernameInput?.getClanTag() ?? null,
+       clanTagCheck: this.usernameInput?.getClanCheck(),
+       playerRole,
 diff --git a/src/client/SinglePlayerModal.ts b/src/client/SinglePlayerModal.ts
 index 3fba34d..83b76e9 100644
 --- a/src/client/SinglePlayerModal.ts
@@ -147,22 +162,53 @@ index 3fba34d..83b76e9 100644
                  ...(this.doomsdayClock
                    ? {
                        doomsdayClock: {
+diff --git a/src/client/hud/layers/TutorialPanel.ts b/src/client/hud/layers/TutorialPanel.ts
+index b27b86f..fbb8cfd 100644
+--- a/src/client/hud/layers/TutorialPanel.ts
++++ b/src/client/hud/layers/TutorialPanel.ts
+@@ -131,7 +131,11 @@ export class TutorialPanel extends LitElement implements Controller {
+     // subscribed to TutorialStateEvent.
+     if (!this.started) {
+       this.started = true;
+-      this.setActive(!this.userSettings.tutorialDismissed());
++      // No tutorial when a fly, not the human, is playing (OpenFly).
++      this.setActive(
++        !this.userSettings.tutorialDismissed() &&
++          this.game.config().gameConfig().openfly === undefined,
++      );
+     }
+     if (!this.active) return;
+ 
 diff --git a/src/core/GameRunner.ts b/src/core/GameRunner.ts
-index 4d21ff1..74e658f 100644
+index 4d21ff1..f89fd23 100644
 --- a/src/core/GameRunner.ts
 +++ b/src/core/GameRunner.ts
-@@ -36,6 +36,10 @@ import {
-   snapshotGame,
- } from "./snapshot/GameSnapshot";
- import { simpleHash } from "./Util";
+@@ -1,3 +1,8 @@
 +import {
 +  openflyExtraExecutions,
 +  openflyNationExecutions,
 +} from "../../../fly/integration/core";
- 
- export async function createGameRunner(
-   gameStart: GameStartInfo,
-@@ -172,8 +176,15 @@ export class GameRunner {
++import { openflyLoadBrain } from "../../../fly/integration/worker";
+ import { placeName, placeSpawnName } from "../client/hud/NameBoxCalculator";
+ import { Config } from "./configuration/Config";
+ import { DoomsdayClockExecution } from "./execution/DoomsdayClockExecution";
+@@ -43,6 +48,7 @@ export async function createGameRunner(
+   mapLoader: GameMapLoader,
+   callBack: (gu: GameUpdateViewData | ErrorUpdate) => void,
+ ): Promise<GameRunner> {
++  await openflyLoadBrain(gameStart);
+   const config = new Config(gameStart.config, null, false, gameStart.listed);
+   const gameMap = await loadGameMap(
+     gameStart.config.gameMap,
+@@ -110,6 +116,7 @@ export async function createGameRunnerFromSnapshot(
+   mapLoader: GameMapLoader,
+   callBack: (gu: GameUpdateViewData | ErrorUpdate) => void,
+ ): Promise<GameRunner> {
++  await openflyLoadBrain(gameStart);
+   const header = readSnapshotHeader(snapshot);
+   const gameMap = await loadGameMap(
+     header.gameConfig.gameMap,
+@@ -172,8 +179,15 @@ export class GameRunner {
        this.game.addExecution(new SpawnTimerExecution());
      }
      if (this.game.config().spawnNations()) {
@@ -201,17 +247,15 @@ index 12bef00..212401c 100644
  
  export const TeamSchema = z.string();
 diff --git a/src/core/snapshot/ExecutionRegistry.ts b/src/core/snapshot/ExecutionRegistry.ts
-index aab89b2..29fba35 100644
+index aab89b2..c3aef70 100644
 --- a/src/core/snapshot/ExecutionRegistry.ts
 +++ b/src/core/snapshot/ExecutionRegistry.ts
-@@ -43,6 +43,7 @@ import { TribeExecutionSnapshot } from "../execution/TribeExecution";
- import { UpgradeStructureExecutionSnapshot } from "../execution/UpgradeStructureExecution";
- import { WarshipExecutionSnapshot } from "../execution/WarshipExecution";
- import { WinCheckExecutionSnapshot } from "../execution/WinCheckExecution";
+@@ -1,4 +1,5 @@
+ // Every entry is `<ClassName>Snapshot`, exported next to its class.
 +import { FlyExecutionSnapshot } from "../../../../fly/game/FlyExecution";
- import type { ExecutionSnapshotType } from "./ExecutionSnapshot";
- 
- /**
+ import { AllianceExtensionExecutionSnapshot } from "../execution/alliance/AllianceExtensionExecution";
+ import { AllianceRejectExecutionSnapshot } from "../execution/alliance/AllianceRejectExecution";
+ import { AllianceRequestExecutionSnapshot } from "../execution/alliance/AllianceRequestExecution";
 @@ -97,4 +98,5 @@ export const EXECUTION_SNAPSHOT_TYPES = [
    UpgradeStructureExecutionSnapshot,
    WarshipExecutionSnapshot,
@@ -219,52 +263,34 @@ index aab89b2..29fba35 100644
 +  FlyExecutionSnapshot,
  ] as unknown as readonly ExecutionSnapshotType<unknown>[];
 diff --git a/src/core/worker/Worker.worker.ts b/src/core/worker/Worker.worker.ts
-index fb3471c..73cd310 100644
+index fb3471c..8a9d137 100644
 --- a/src/core/worker/Worker.worker.ts
 +++ b/src/core/worker/Worker.worker.ts
-@@ -6,6 +6,7 @@ import {
-   createGameRunnerFromSnapshot,
-   GameRunner,
- } from "../GameRunner";
-+import { openflyPrepareWorker } from "../../../../fly/integration/worker";
- import {
-   AttackClusteredPositionsResultMessage,
-   InitializedMessage,
-@@ -152,7 +153,9 @@ ctx.addEventListener("message", async (e: MessageEvent<MainThreadMessage>) => {
-         // Set before createGameRunner so map fetches via mapLoader pick up the
-         // CDN base. Workers have no `window`, so AssetUrls falls back to this.
-         globalThis.__CDN_BASE__ = message.cdnBase;
--        gameRunner = (
-+        gameRunner = openflyPrepareWorker(message.gameStartInfo, (m, t) =>
-+          ctx.postMessage(m, t),
-+        ).then(() =>
-           message.snapshot !== undefined
-             ? createGameRunnerFromSnapshot(
-                 message.gameStartInfo,
-@@ -166,7 +169,7 @@ ctx.addEventListener("message", async (e: MessageEvent<MainThreadMessage>) => {
-                 message.clientID,
-                 mapLoader,
-                 gameUpdate,
--              )
-+              ),
-         ).then((gr) => {
-           sendMessage({
-             type: "initialized",
+@@ -1,3 +1,4 @@
++import { openflyWorkerSink } from "../../../../fly/integration/worker";
+ import { assetUrl } from "../AssetUrls";
+ import { FetchGameMapLoader } from "../game/FetchGameMapLoader";
+ import { ErrorUpdate, GameUpdateViewData } from "../game/GameUpdates";
+@@ -21,6 +22,7 @@ import {
+ } from "./WorkerMessages";
+ 
+ const ctx: Worker = self as any;
++openflyWorkerSink((message, transfer) => ctx.postMessage(message, transfer));
+ globalThis.__ASSET_MANIFEST__ = __ASSET_MANIFEST__;
+ let gameRunner: Promise<GameRunner> | null = null;
+ const mapLoader = new FetchGameMapLoader((path) => assetUrl(`maps/${path}`));
 diff --git a/src/core/worker/WorkerClient.ts b/src/core/worker/WorkerClient.ts
-index ff4b4b6..143e2dd 100644
+index ff4b4b6..312c20b 100644
 --- a/src/core/worker/WorkerClient.ts
 +++ b/src/core/worker/WorkerClient.ts
-@@ -12,6 +12,10 @@ import { TileRef } from "../game/GameMap";
- import { ErrorUpdate, GameUpdateViewData } from "../game/GameUpdates";
- import { ClientID, GameStartInfo, Turn } from "../Schemas";
- import { generateID } from "../Util";
+@@ -1,3 +1,7 @@
 +import {
 +  dispatchOpenflyTelemetry,
 +  isOpenflyTelemetry,
 +} from "../../../../fly/integration/events";
- import { WorkerMessage } from "./WorkerMessages";
- 
- // Inlined as a same-origin Blob (Vite's `?worker&inline`), sidestepping the
+ import { getCdnBase } from "../AssetUrls";
+ import {
+   BuildableUnit,
 @@ -44,6 +48,10 @@ export class WorkerClient {
  
    private handleWorkerMessage(event: MessageEvent<WorkerMessage>) {

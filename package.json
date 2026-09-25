@@ -11,6 +11,7 @@
     "fly:probe": "cd openfront && npx tsx ../fly/train/calibrateBrain.ts",
     "fly:train": "cd openfront && npx tsx ../fly/train/train.ts",
     "fly:eval": "cd openfront && npx tsx ../fly/train/evaluate.ts",
-    "test": "cd openfront && npx vitest run --config ../fly/vitest.config.ts"
+    "test": "cd openfront && npx vitest run --config ../fly/vitest.config.ts",
+    "format": "prettier --write \"fly/**/*.ts\" && scripts/make-patch.sh"
   }
 }

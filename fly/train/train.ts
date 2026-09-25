@@ -16,7 +16,12 @@ import { ReadoutWeights } from "../brain/Readout";
 import type { FlyPolicy } from "../game/FlyExecution";
 import { ACTIONS, N_ACTIONS } from "../game/Motor";
 import { BatchGame, runBatch, summarize } from "./batch";
-import { countFeatures, DEFAULT_FIT, fitReadout, senseFeatures } from "./fitReadout";
+import {
+  countFeatures,
+  DEFAULT_FIT,
+  fitReadout,
+  senseFeatures,
+} from "./fitReadout";
 import { loadConnectomeFromDisk } from "./NodeBrainLoader";
 import { readRecords, RECORD_BYTES } from "./records";
 
@@ -47,7 +52,8 @@ async function collect(a: Map<string, string>) {
   const dir = a.get("dir")!;
   const round = Number(a.get("round") ?? 0);
   const n = Number(a.get("games") ?? 32);
-  const policy = (a.get("policy") ?? (round === 0 ? "teacher" : "dagger")) as FlyPolicy;
+  const policy = (a.get("policy") ??
+    (round === 0 ? "teacher" : "dagger")) as FlyPolicy;
   const readoutPath = a.get("readout");
   fs.mkdirSync(dir, { recursive: true });
   const games: BatchGame[] = [];
@@ -75,7 +81,10 @@ async function collect(a: Map<string, string>) {
     ),
   );
   console.log(summarize(results));
-  fs.writeFileSync(path.join(dir, `r${round}-results.json`), JSON.stringify(results, null, 1));
+  fs.writeFileSync(
+    path.join(dir, `r${round}-results.json`),
+    JSON.stringify(results, null, 1),
+  );
 }
 
 function fit(a: Map<string, string>) {
@@ -102,26 +111,45 @@ function fit(a: Map<string, string>) {
   const dist = new Array<number>(N_ACTIONS).fill(0);
   for (let i = 0; i < d.n; i++) dist[d.teacher[i]]++;
   console.log(
-    "teacher choices: " + ACTIONS.map((x, i) => `${x.key} ${dist[i]}`).join(", "),
+    "teacher choices: " +
+      ACTIONS.map((x, i) => `${x.key} ${dist[i]}`).join(", "),
   );
 
   // Reference: the same regression straight from the 13 senses, i.e. what a
   // readout could do if the brain passed its input through untouched.
   console.log("fitting on raw senses (reference)…");
-  const ref = fitReadout(d, train, val, 13, senseFeatures, { ...DEFAULT_FIT, epochs: 25 }, console.log);
+  const ref = fitReadout(
+    d,
+    train,
+    val,
+    13,
+    senseFeatures,
+    { ...DEFAULT_FIT, epochs: 25 },
+    console.log,
+  );
   console.log("fitting on descending/motor neuron spike counts…");
   const opt = {
     ...DEFAULT_FIT,
     epochs: Number(a.get("epochs") ?? DEFAULT_FIT.epochs),
     l2: Number(a.get("l2") ?? DEFAULT_FIT.l2),
   };
-  const res = fitReadout(d, train, val, conn.readout.length, countFeatures, opt, console.log);
+  const res = fitReadout(
+    d,
+    train,
+    val,
+    conn.readout.length,
+    countFeatures,
+    opt,
+    console.log,
+  );
   const majority = Math.max(...dist) / d.n;
   console.log(
     `held-out accuracy: brain readout ${(100 * res.valAcc).toFixed(1)}% (train ${(100 * res.trainAcc).toFixed(1)}%), raw senses ${(100 * ref.valAcc).toFixed(1)}%, always-majority ${(100 * majority).toFixed(1)}%`,
   );
   res.perAction.forEach((q, i) =>
-    console.log(`  ${ACTIONS[i].key.padEnd(10)} n=${String(q.n).padStart(5)} recall ${(100 * q.recall).toFixed(0)}%`),
+    console.log(
+      `  ${ACTIONS[i].key.padEnd(10)} n=${String(q.n).padStart(5)} recall ${(100 * q.recall).toFixed(0)}%`,
+    ),
   );
   let active = 0;
   for (let j = 0; j < conn.readout.length; j++) if (res.std[j] > 1e-6) active++;
@@ -134,11 +162,15 @@ function fit(a: Map<string, string>) {
     mean: Array.from(res.mean, (v) => +v.toFixed(5)),
     std: Array.from(res.std, (v) => +v.toFixed(5)),
     W: Array.from({ length: N_ACTIONS }, (_, i) =>
-      Array.from(res.W.subarray(i * conn.readout.length, (i + 1) * conn.readout.length), (v) => +v.toFixed(5)),
+      Array.from(
+        res.W.subarray(i * conn.readout.length, (i + 1) * conn.readout.length),
+        (v) => +v.toFixed(5),
+      ),
     ),
     b: Array.from(res.b, (v) => +v.toFixed(5)),
     training: {
-      method: "behaviour cloning + DAgger from a heuristic teacher (masked softmax regression)",
+      method:
+        "behaviour cloning + DAgger from a heuristic teacher (masked softmax regression)",
       decisions: d.n,
       games: files.length,
       heldOutAccuracy: +res.valAcc.toFixed(4),
@@ -146,11 +178,15 @@ function fit(a: Map<string, string>) {
       rawSenseAccuracy: +ref.valAcc.toFixed(4),
       majorityBaseline: +majority.toFixed(4),
       readoutNeuronsThatFired: active,
-      perActionRecall: Object.fromEntries(res.perAction.map((q, i) => [ACTIONS[i].key, +q.recall.toFixed(3)])),
+      perActionRecall: Object.fromEntries(
+        res.perAction.map((q, i) => [ACTIONS[i].key, +q.recall.toFixed(3)]),
+      ),
     },
   };
   fs.writeFileSync(out, JSON.stringify(weights));
-  console.log(`wrote ${out} (${active} of ${conn.readout.length} readout neurons fired in the data)`);
+  console.log(
+    `wrote ${out} (${active} of ${conn.readout.length} readout neurons fired in the data)`,
+  );
 }
 
 const cmd = process.argv[2];

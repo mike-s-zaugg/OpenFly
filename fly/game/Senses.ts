@@ -182,7 +182,9 @@ export function senses(s: Situation, out = new Float32Array(13)): Float32Array {
   out[7] = clamp01(s.allianceRequests.length / 2);
   out[8] = clamp01(s.elapsedSec / 1500);
   out[9] = clamp01(s.troopRatio);
-  out[10] = Number.isFinite(s.cityCost) ? clamp01(s.gold / (2 * s.cityCost)) : 0;
+  out[10] = Number.isFinite(s.cityCost)
+    ? clamp01(s.gold / (2 * s.cityCost))
+    : 0;
   out[11] = clamp01(Math.sqrt(s.landShare * 4));
   out[12] = clamp01(s.outgoingTroops / (s.outgoingTroops + t));
   return out;

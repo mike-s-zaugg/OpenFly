@@ -34,7 +34,8 @@ export class Readout {
     this.neurons = Uint16Array.from(weights.neurons);
     this.W = new Float32Array(this.nIn * this.nOut);
     for (let a = 0; a < this.nOut; a++) {
-      for (let j = 0; j < this.nIn; j++) this.W[a * this.nIn + j] = weights.W[a][j];
+      for (let j = 0; j < this.nIn; j++)
+        this.W[a * this.nIn + j] = weights.W[a][j];
     }
     this.b = Float32Array.from(weights.b);
     this.mean = Float32Array.from(weights.mean);
@@ -43,14 +44,20 @@ export class Readout {
   }
 
   /** Readout input features from raw brain spike counts. */
-  static features(counts: Uint16Array, neurons: Uint16Array, out: Float32Array): Float32Array {
-    for (let j = 0; j < neurons.length; j++) out[j] = Math.log1p(counts[neurons[j]]);
+  static features(
+    counts: Uint16Array,
+    neurons: Uint16Array,
+    out: Float32Array,
+  ): Float32Array {
+    for (let j = 0; j < neurons.length; j++)
+      out[j] = Math.log1p(counts[neurons[j]]);
     return out;
   }
 
   scores(counts: Uint16Array, out = new Float32Array(this.nOut)): Float32Array {
     const z = Readout.features(counts, this.neurons, this.z);
-    for (let j = 0; j < this.nIn; j++) z[j] = (z[j] - this.mean[j]) * this.invStd[j];
+    for (let j = 0; j < this.nIn; j++)
+      z[j] = (z[j] - this.mean[j]) * this.invStd[j];
     for (let a = 0; a < this.nOut; a++) {
       let s = this.b[a];
       const row = a * this.nIn;
@@ -81,7 +88,8 @@ export function maskedSoftmax(
   out = new Float32Array(scores.length),
 ): Float32Array {
   let max = -Infinity;
-  for (let a = 0; a < scores.length; a++) if (mask[a] && scores[a] > max) max = scores[a];
+  for (let a = 0; a < scores.length; a++)
+    if (mask[a] && scores[a] > max) max = scores[a];
   let sum = 0;
   for (let a = 0; a < scores.length; a++) {
     out[a] = mask[a] ? Math.exp(scores[a] - max) : 0;

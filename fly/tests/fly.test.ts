@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { FlyRegistry } from "../game/FlyRegistry";
-import { FlyDecisionTelemetry, FlyTelemetry } from "../game/Telemetry";
 import { N_ACTIONS } from "../game/Motor";
+import { FlyDecisionTelemetry, FlyTelemetry } from "../game/Telemetry";
 import { playHeadless } from "../train/HeadlessGame";
 import { loadConnectomeFromDisk } from "../train/NodeBrainLoader";
 
@@ -27,7 +27,9 @@ describe("a fly in a real game", () => {
     expect(res.alive).toBe(true);
     expect(res.decisions).toBeGreaterThan(20);
     expect(res.landShare).toBeGreaterThan(0);
-    expect(seen.some((t) => t.type === "openfly_status" && t.status === "spawned")).toBe(true);
+    expect(
+      seen.some((t) => t.type === "openfly_status" && t.status === "spawned"),
+    ).toBe(true);
 
     const decisions = seen.filter(
       (t): t is FlyDecisionTelemetry => t.type === "openfly_decision",

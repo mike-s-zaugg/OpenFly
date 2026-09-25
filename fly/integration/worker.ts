@@ -4,7 +4,7 @@ import { Readout, ReadoutWeights } from "../brain/Readout";
 import { FlyRegistry } from "../game/FlyRegistry";
 import { FlyTelemetry } from "../game/Telemetry";
 
-// Runs inside OpenFront's game worker before the game is created: loads the
+// Runs where OpenFront creates the game (normally its game worker): loads the
 // connectome and trained readout when the game has an OpenFly mode, and
 // forwards brain telemetry to the main thread.
 
@@ -17,7 +17,9 @@ function assetOrigin(): string {
   return (globalThis as { location?: Location }).location?.origin ?? "";
 }
 
-export async function fetchConnectome(origin = assetOrigin()): Promise<Connectome> {
+export async function fetchConnectome(
+  origin = assetOrigin(),
+): Promise<Connectome> {
   const base = `${origin}${OPENFLY_ASSET_BASE}`;
   const metaRes = await fetch(`${base}${BRAIN_STEM}.json`);
   if (!metaRes.ok) throw new Error(`OpenFly: brain metadata ${metaRes.status}`);
@@ -32,22 +34,26 @@ export async function fetchConnectome(origin = assetOrigin()): Promise<Connectom
     raw[0] === 0x1f && raw[1] === 0x8b
       ? new Uint8Array(
           await new Response(
-            new Blob([raw]).stream().pipeThrough(new DecompressionStream("gzip")),
+            new Blob([raw])
+              .stream()
+              .pipeThrough(new DecompressionStream("gzip")),
           ).arrayBuffer(),
         )
       : raw;
   return new Connectome(meta, bytes);
 }
 
-export async function fetchReadout(origin = assetOrigin()): Promise<Readout | null> {
+export async function fetchReadout(
+  origin = assetOrigin(),
+): Promise<Readout | null> {
   const res = await fetch(`${origin}${OPENFLY_ASSET_BASE}readout.json`);
   if (!res.ok) return null;
   return new Readout((await res.json()) as ReadoutWeights);
 }
 
-export async function openflyPrepareWorker(
+/** Loads the connectome and readout if this game has an OpenFly mode. */
+export async function openflyLoadBrain(
   gameStartInfo: GameStartInfo,
-  post: (message: FlyTelemetry, transfer: Transferable[]) => void,
 ): Promise<void> {
   if (gameStartInfo.config.openfly === undefined) return;
   if (!FlyRegistry.hasConnectome()) {
@@ -57,9 +63,18 @@ export async function openflyPrepareWorker(
     try {
       FlyRegistry.setReadout(await fetchReadout());
     } catch (e) {
-      console.warn("OpenFly: no trained readout, the teacher policy will drive", e);
+      console.warn(
+        "OpenFly: no trained readout, the teacher policy will drive",
+        e,
+      );
     }
   }
+}
+
+/** Sends fly telemetry from the game worker to the main thread. */
+export function openflyWorkerSink(
+  post: (message: FlyTelemetry, transfer: Transferable[]) => void,
+): void {
   FlyRegistry.setTelemetrySink((t) => {
     const transfer: Transferable[] =
       t.type === "openfly_decision"

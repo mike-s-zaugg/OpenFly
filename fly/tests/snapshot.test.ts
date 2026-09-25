@@ -1,7 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { Config } from "../../openfront/src/core/configuration/Config";
 import { Execution } from "../../openfront/src/core/game/Game";
-import { restoreGame, snapshotGame } from "../../openfront/src/core/snapshot/GameSnapshot";
+import {
+  restoreGame,
+  snapshotGame,
+} from "../../openfront/src/core/snapshot/GameSnapshot";
 import { FlyExecution } from "../game/FlyExecution";
 import { FlyRegistry } from "../game/FlyRegistry";
 import { createHeadlessGame, loadHeadlessTerrain } from "../train/HeadlessGame";

@@ -25,28 +25,48 @@ export const CHANNEL_COLORS: [number, number, number][] = [
 ];
 const READOUT_COLOR: [number, number, number] = [1.0, 0.35, 0.15];
 
+const SHORT: Record<string, string> = {
+  sugar: "Sugar",
+  touch: "Touch",
+  looming: "Looming",
+  pursuit: "Pursuit",
+  prey: "Prey",
+  rival: "Collision",
+  wind: "Wind",
+  song: "Hearing",
+  light: "Ocelli",
+  energy: "Energy",
+  wealth: "Gut",
+  size: "Size",
+  strain: "Effort",
+};
+
 const css = (c: [number, number, number], a = 1) =>
   `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${a})`;
 
 const STYLE = `
-.of-panel{position:fixed;top:64px;right:12px;width:370px;max-height:calc(100vh - 140px);z-index:40;
+.of-panel{position:fixed;top:64px;right:12px;width:390px;max-height:calc(100vh - 250px);z-index:40;
   background:rgba(8,10,16,.88);color:#dfe6f3;border:1px solid rgba(120,140,190,.35);border-radius:10px;
   font:12px/1.35 ui-sans-serif,system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;
   overflow:hidden;user-select:none}
 .of-panel.of-collapsed{width:auto}
 .of-panel.of-collapsed .of-body{display:none}
-.of-head{display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:move;background:rgba(40,50,80,.35)}
-.of-title{font-weight:600;flex:1;white-space:nowrap}
+.of-head{display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:move;background:rgba(40,50,80,.35)}
+.of-title{font-weight:600;flex:1;min-width:0}
+.of-title .of-sub{font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.of-status{white-space:nowrap;color:#cfe3ff;font-size:11px}
 .of-sub{color:#8f9bb5;font-size:11px}
 .of-btn{background:none;border:1px solid rgba(160,170,210,.35);color:#cdd6ea;border-radius:5px;padding:1px 7px;cursor:pointer}
 .of-body{overflow-y:auto;padding:0 10px 10px}
-.of-canvas-wrap{position:relative;margin:8px -10px 6px;height:250px}
+.of-canvas-wrap{position:relative;margin:0 -10px 4px;height:200px}
 .of-canvas{width:100%;height:100%;display:block;cursor:grab}
 .of-tip{position:absolute;pointer-events:none;background:rgba(0,0,0,.8);border:1px solid #445;border-radius:5px;
   padding:4px 6px;font-size:11px;white-space:nowrap;display:none}
 .of-legend{position:absolute;left:8px;bottom:6px;font-size:10px;color:#8f9bb5;pointer-events:none}
-.of-sec{margin-top:8px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#8f9bb5;display:flex;justify-content:space-between}
-.of-row{display:grid;grid-template-columns:118px 1fr 34px;align-items:center;gap:6px;margin-top:3px}
+.of-sec{margin-top:6px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#8f9bb5;display:flex;justify-content:space-between}
+.of-row{display:grid;grid-template-columns:168px 1fr 30px;align-items:center;gap:6px;margin-top:1px;line-height:16px}
+.of-senses{display:grid;grid-template-columns:1fr 1fr;column-gap:12px}
+.of-senses .of-row{grid-template-columns:58px 1fr 24px}
 .of-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .of-bar{height:8px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden}
 .of-fill{height:100%;border-radius:4px;transition:width .25s}
@@ -54,10 +74,10 @@ const STYLE = `
 .of-row.of-off{opacity:.35}
 .of-row.of-chosen .of-name{color:#fff;font-weight:600}
 .of-row.of-chosen .of-name:before{content:"▶ ";color:#ff7a3d}
-.of-foot{margin-top:8px;color:#8f9bb5;font-size:11px}
-.of-log{margin-top:6px;font-size:11px;color:#b9c3d8;max-height:96px;overflow:hidden}
+.of-foot{margin-top:4px;color:#8f9bb5;font-size:11px}
+.of-log{margin-top:4px;font-size:11px;color:#b9c3d8;max-height:48px;overflow:hidden}
 .of-log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.of-spark{width:100%;height:28px;display:block;margin-top:4px}
+.of-spark{width:100%;height:24px;display:block;margin-top:4px}
 .of-teach{color:#8f9bb5}
 `;
 
@@ -97,8 +117,7 @@ export class BrainPanel {
     root.innerHTML = `
       <div class="of-head">
         <span>🪰</span>
-        <div class="of-title">Fly brain<div class="of-sub">FlyWire 783 · ${c.nSim.toLocaleString()} spiking neurons of ${c.nAll.toLocaleString()}</div></div>
-        <span class="of-sub of-status">waking up…</span>
+        <div class="of-title">Fly brain <span class="of-status">waking up…</span><div class="of-sub">FlyWire 783 · ${c.nSim.toLocaleString()} of ${c.nAll.toLocaleString()} neurons spiking</div></div>
         <button class="of-btn of-collapse" title="Collapse">–</button>
       </div>
       <div class="of-body">
@@ -107,7 +126,7 @@ export class BrainPanel {
           <div class="of-tip"></div>
           <div class="of-legend">drag to rotate · wheel to zoom · click a neuron for Virtual Fly Brain</div>
         </div>
-        <div class="of-sec"><span>Senses → sensory neurons</span><span>Hz</span></div>
+        <div class="of-sec"><span>Senses → sensory neurons (Hz)</span><span>hover for details</span></div>
         <div class="of-senses"></div>
         <div class="of-sec"><span>Descending neurons → motor programs</span><span>vote</span></div>
         <div class="of-motor"></div>
@@ -125,8 +144,8 @@ export class BrainPanel {
 
     const senses = root.querySelector(".of-senses")!;
     c.meta.channels.forEach((ch, i) => {
-      const row = this.row(ch.label, css(CHANNEL_COLORS[i]));
-      row.title = `${ch.game}\n\n${ch.label}: ${ch.neurons.length} neurons\n${ch.why}`;
+      const row = this.row(SHORT[ch.key] ?? ch.label, css(CHANNEL_COLORS[i]));
+      row.title = `${ch.game}\n\n${ch.label}, ${ch.neurons.length} neurons. ${ch.why}`;
       senses.appendChild(row);
       this.senseRows.push(row);
     });
@@ -145,7 +164,12 @@ export class BrainPanel {
     const canvas = root.querySelector<HTMLCanvasElement>(".of-canvas")!;
     try {
       this.renderer = new BrainRenderer(canvas, c);
-      this.renderer.setTagColors([[1, 1, 1], ...CHANNEL_COLORS, [1, 1, 1], READOUT_COLOR]);
+      this.renderer.setTagColors([
+        [1, 1, 1],
+        ...CHANNEL_COLORS,
+        [1, 1, 1],
+        READOUT_COLOR,
+      ]);
       c.channelNeurons.forEach((list, ch) => {
         for (const i of list) this.renderer!.tag[i] = ch + 1;
       });
@@ -153,10 +177,12 @@ export class BrainPanel {
       this.renderer.markTagsDirty();
       this.bindCanvas(canvas);
     } catch (e) {
-      canvas.replaceWith(Object.assign(document.createElement("div"), {
-        textContent: `3D view unavailable: ${String(e)}`,
-        style: "padding:20px;color:#8f9bb5",
-      }));
+      canvas.replaceWith(
+        Object.assign(document.createElement("div"), {
+          textContent: `3D view unavailable: ${String(e)}`,
+          style: "padding:20px;color:#8f9bb5",
+        }),
+      );
     }
     this.raf = requestAnimationFrame((t) => this.frame(t));
   }
@@ -170,7 +196,8 @@ export class BrainPanel {
   }
 
   private setRow(row: HTMLDivElement, frac: number, text: string): void {
-    (row.querySelector(".of-fill") as HTMLDivElement).style.width = `${Math.round(Math.max(0, Math.min(1, frac)) * 100)}%`;
+    (row.querySelector(".of-fill") as HTMLDivElement).style.width =
+      `${Math.round(Math.max(0, Math.min(1, frac)) * 100)}%`;
     row.querySelector(".of-val")!.textContent = text;
   }
 
@@ -269,12 +296,18 @@ export class BrainPanel {
       this.tip.style.left = `${Math.min(x + 12, rect.width - 200)}px`;
       this.tip.style.top = `${y + 12}px`;
     });
-    canvas.addEventListener("pointerleave", () => (this.tip.style.display = "none"));
+    canvas.addEventListener(
+      "pointerleave",
+      () => (this.tip.style.display = "none"),
+    );
     canvas.addEventListener(
       "wheel",
       (e) => {
         e.preventDefault();
-        r.zoom = Math.max(0.6, Math.min(6, r.zoom * Math.exp(-e.deltaY * 0.001)));
+        r.zoom = Math.max(
+          0.6,
+          Math.min(6, r.zoom * Math.exp(-e.deltaY * 0.001)),
+        );
       },
       { passive: false },
     );
@@ -285,15 +318,24 @@ export class BrainPanel {
     if (t.flyId !== this.flyId) return;
     if (t.type === "openfly_status") {
       this.status.textContent =
-        t.status === "spawned" ? "landed" : t.status === "died" ? "died ✝" : "won 🏆";
-      this.addLog(`${this.clock(t.tick)} ${t.status === "spawned" ? "landed on the map" : t.status}`);
+        t.status === "spawned"
+          ? "· landed"
+          : t.status === "died"
+            ? "· died ✝"
+            : "· won 🏆";
+      this.addLog(
+        `${this.clock(t.tick)} ${t.status === "spawned" ? "landed on the map" : t.status}`,
+      );
       return;
     }
     const now = performance.now();
     if (this.lastArrival > 0) {
       // Replay each 100 ms window across the time until the next decision.
       const gap = now - this.lastArrival;
-      this.replayDur = Math.max(250, Math.min(2500, 0.8 * this.replayDur + 0.2 * gap * 0.95));
+      this.replayDur = Math.max(
+        250,
+        Math.min(2500, 0.8 * this.replayDur + 0.2 * gap * 0.95),
+      );
     }
     this.lastArrival = now;
     this.current = t;
@@ -316,10 +358,17 @@ export class BrainPanel {
   }
 
   private updateBars(t: FlyDecisionTelemetry): void {
-    this.status.textContent = t.stats.alive ? `${(100 * t.stats.landShare).toFixed(1)}% of land` : "died ✝";
-    t.senses.forEach((v, i) => this.setRow(this.senseRows[i], v, `${Math.round(t.rates[i])}`));
+    this.status.textContent = t.stats.alive
+      ? `· ${(100 * t.stats.landShare).toFixed(1)}% of the land`
+      : "· died ✝";
+    t.senses.forEach((v, i) =>
+      this.setRow(this.senseRows[i], v, `${Math.round(t.rates[i])}`),
+    );
     const mask = Uint8Array.from(t.mask);
-    const probs = t.scores === null ? null : maskedSoftmax(Float32Array.from(t.scores), mask);
+    const probs =
+      t.scores === null
+        ? null
+        : maskedSoftmax(Float32Array.from(t.scores), mask);
     ACTIONS.forEach((a, i) => {
       const row = this.motorRows[i];
       row.classList.toggle("of-off", mask[i] === 0);
@@ -334,8 +383,13 @@ export class BrainPanel {
             : "";
     });
     const a = ACTIONS[t.action];
-    const agree = t.action === t.teacherAction ? "" : ` (teacher: ${ACTIONS[t.teacherAction].label})`;
-    this.addLog(`${this.clock(t.tick)} ${a.label}${t.executed ? "" : " (nothing to do)"}${agree}`);
+    const agree =
+      t.action === t.teacherAction
+        ? ""
+        : ` (teacher: ${ACTIONS[t.teacherAction].label})`;
+    this.addLog(
+      `${this.clock(t.tick)} ${a.label}${t.executed ? "" : " (nothing to do)"}${agree}`,
+    );
     this.foot.innerHTML = `${t.totalSpikes.toLocaleString()} spikes in ${t.windowMs} ms · ${t.computeMs.toFixed(0)} ms CPU · decision ${this.decisionCount} · ${t.policy === "brain" ? "brain in control" : `<span class="of-teach">${t.policy}</span>`}`;
     this.drawSpark(t);
   }
@@ -363,11 +417,20 @@ export class BrainPanel {
       g.fillRect(s * bw, cv.height - h, Math.max(1, bw - 0.5), h);
       const h2 = (dn[s] / maxDn) * cv.height * 0.6;
       g.fillStyle = css(READOUT_COLOR, 0.9);
-      g.fillRect(s * bw, cv.height - h2, Math.max(1, bw - 0.5), Math.min(h2, 2 * dpr));
+      g.fillRect(
+        s * bw,
+        cv.height - h2,
+        Math.max(1, bw - 0.5),
+        Math.min(h2, 2 * dpr),
+      );
     }
     g.fillStyle = "#8f9bb5";
     g.font = `${10 * dpr}px sans-serif`;
-    g.fillText("population spikes / ms (orange: descending)", 4 * dpr, 11 * dpr);
+    g.fillText(
+      "population spikes / ms (orange: descending)",
+      4 * dpr,
+      11 * dpr,
+    );
   }
 
   private frame(time: number): void {
@@ -384,7 +447,10 @@ export class BrainPanel {
       const t = this.current;
       if (t !== null) {
         const steps = Math.round(t.windowMs / t.dtMs);
-        const upTo = Math.min(steps, ((time - this.replayStart) / this.replayDur) * steps);
+        const upTo = Math.min(
+          steps,
+          ((time - this.replayStart) / this.replayDur) * steps,
+        );
         const sn = t.spikeNeuron;
         const ss = t.spikeStep;
         while (this.replayCursor < sn.length && ss[this.replayCursor] <= upTo) {
