@@ -23,8 +23,8 @@ npm run dev        # OpenFront dev server on http://localhost:9000
 ```
 
 In the browser: **Solo**, pick a map and difficulty, then **🪰 Let the fly play**. The fly takes your player
-slot, so the HUD, gold, troops and leaderboard are the fly's. Your clicks are ignored in this mode (pause and game
-speed still work, which helps: a fly match takes 10 to 15 minutes at normal speed).
+slot, so the HUD, gold, troops and leaderboard are the fly's ("Fly" on the map). Your clicks are ignored in this
+mode. Pause and the fast-forward button still work, which helps: a fly match takes 10 to 15 minutes at normal speed.
 
 ## What is going on in the fly's head
 
@@ -72,8 +72,10 @@ The 3D view draws every FlyWire neuron at its real position. Optic lobes are a d
 simulated neurons flash when they spike, in the color of their sensory channel, orange for descending neurons and
 pale yellow for everything in between. Each 100 ms decision window is replayed in slow motion until the next
 decision. Hover a neuron for its cell type, class and transmitter; click it to open it in Virtual Fly Brain. Below
-the brain: the 13 senses with their firing rates, the readout's vote for each motor program (▶ marks the chosen one),
+the brain: the 13 senses with their firing rates (hover a sense for what it means in the game and which neurons it
+drives), the readout's vote for each motor program (▶ marks the chosen one, greyed rows are not possible right now),
 the population spike histogram of the window, and a log that notes whenever the brain disagrees with the teacher.
+The panel can be dragged by its title and collapsed.
 
 ## How the fly learned to play
 
@@ -100,12 +102,17 @@ Easy and Medium nations; 150 bot tribes; 2 seeds each), stopped after 15 minutes
 | Player | Easy: won | Easy: top 3 | Medium: won | Medium: top 3 | Survived | Mean land at the end |
 | --- | --- | --- | --- | --- | --- | --- |
 | Teacher (hand-written) | 8 / 12 | 11 / 12 | 3 / 12 | 9 / 12 | 22 / 24 | 52.3% |
-| Fly brain (readout round 0) | 7 / 12 | 11 / 12 | 1 / 12 | 10 / 12 | 22 / 24 | 51.3% |
+| Fly brain, behaviour cloning only | 7 / 12 | 11 / 12 | 1 / 12 | 10 / 12 | 22 / 24 | 51.3% |
+| Fly brain, after one DAgger round | 8 / 12 | 11 / 12 | 2 / 12 | 12 / 12 | 24 / 24 | 57.3% |
 
-Imitation accuracy on held-out games: 83.5% from descending/motor neuron spikes, 83.0% for the same regression on
-the 13 raw game signals, 49.6% for always answering "wait". The readout does as well as a model that sees the game
-directly, so the connectome carries what the game signals mean through to its output neurons. 728 of the 1,413
-readout neurons fired at least once during training.
+After DAgger the fly beats its teacher: against Medium nations it finished in the top three in every game and held
+48.5% of the land on average after 15 minutes, against 35.7% for the teacher. Per-game results are in
+`fly/train/results/benchmark.json`.
+
+Imitation accuracy on held-out games is 86.7% from descending/motor neuron spikes. The same regression on the 13
+raw game signals reaches 83.0%, and always answering "wait" 48.6%. The readout does better than a model that sees
+the game directly: the connectome's nonlinear processing turns the teacher's threshold rules into something a
+linear readout can pick up. 730 of the 1,413 readout neurons fired at least once in the training data.
 
 Where it struggles: island maps (it takes its own island and then ferries troops too timidly), and Hard nations,
 which usually overrun it (the teacher has the same weakness).
@@ -174,9 +181,10 @@ visual game signals enter through visual projection neurons instead.
 ## Roadmap: you against a swarm
 
 The core already supports `openfly: { mode: "versus", maxFlies }`, which replaces up to `maxFlies` nations with fly
-brains. Each fly brain costs roughly 25 ms of worker CPU per second of game time, so a handful of flies is fine;
-a full map of 70 flies would need a cheaper brain (shared simulation, fewer neurons, or longer decision intervals).
-What is missing is the menu option and a viewer that can switch between flies.
+brains while you play normally. Each fly brain costs 40 to 80 ms of worker CPU per decision (one decision per 1.5 s
+of game time), so a handful of flies is fine; a full map of 70 flies would need a cheaper brain (a shared
+simulation, fewer neurons, or longer decision intervals). What is missing is the menu option and a viewer that can
+switch between flies.
 
 ## License
 

@@ -53,6 +53,7 @@ export function openflyPlugin(): Plugin {
       const dest = path.join(outDir, "openfly");
       fs.mkdirSync(dest, { recursive: true });
       for (const f of fs.readdirSync(BRAIN_DIR)) {
+        if (!/\.(json|gz)$/.test(f)) continue;
         fs.copyFileSync(path.join(BRAIN_DIR, f), path.join(dest, f));
       }
     },
