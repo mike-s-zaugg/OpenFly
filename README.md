@@ -12,8 +12,10 @@ neurons. You watch it play a normal singleplayer match while a panel shows its w
 
 ## Quick start
 
-Requirements: Node 24.15+ with npm 12.1+ (OpenFront's own requirement), git, a browser with WebGL2 and hardware
-acceleration.
+Requirements: Node 24 or newer, git, and a browser with WebGL2 and hardware acceleration. OpenFront pins Node 24.x
+with npm 12.x; on other versions `npm run setup` warns and installs anyway. That has been checked on Node 26 with
+npm 11 (tests, build, dev server and fly games all work). If you hit a problem there, switch to Node 24
+(`nvm install 24 && npm i -g npm@12`) and run setup again.
 
 ```bash
 git clone --recursive https://github.com/mike-s-zaugg/OpenFly.git
