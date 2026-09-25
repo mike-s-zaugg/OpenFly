@@ -2,3 +2,4 @@
 	path = openfront
 	url = https://github.com/openfrontio/OpenFrontIO.git
 	shallow = true
+	ignore = dirty
