@@ -1,0 +1,560 @@
+[
+ {
+  "seed": "tune-pangaea-1",
+  "map": "pangaea",
+  "ticks": 12000,
+  "alive": true,
+  "landShare": 0.5116605118712716,
+  "peakLandShare": 0.6548402505766265,
+  "rank": 1,
+  "players": 3,
+  "won": false,
+  "winner": null,
+  "decisions": 798,
+  "actionCounts": {
+   "military": [
+    571,
+    8,
+    187,
+    18,
+    12,
+    2
+   ],
+   "economy": [
+    640,
+    29,
+    13,
+    31,
+    57,
+    2,
+    0,
+    26
+   ]
+  },
+  "maxTickMs": 47.448135000006005,
+  "brainMs": 46412.54495300007,
+  "wallMs": 78469.802532,
+  "records": 0,
+  "spec": {
+   "map": "pangaea",
+   "difficulty": "Medium",
+   "bots": 300,
+   "seed": "tune-pangaea-1",
+   "maxTicks": 12000,
+   "policy": "brain",
+   "readoutPath": "/tmp/claude-0/-home-user-OpenFly/db6ee624-d094-51e9-8e4c-359c03825939/scratchpad/work4/readout_r1.json"
+  }
+ },
+ {
+  "seed": "tune-pangaea-2",
+  "map": "pangaea",
+  "ticks": 12000,
+  "alive": true,
+  "landShare": 0.1946029797660067,
+  "peakLandShare": 0.458795960364947,
+  "rank": 2,
+  "players": 5,
+  "won": false,
+  "winner": null,
+  "decisions": 799,
+  "actionCounts": {
+   "military": [
+    526,
+    9,
+    151,
+    38,
+    21,
+    54
+   ],
+   "economy": [
+    428,
+    130,
+    37,
+    56,
+    75,
+    51,
+    0,
+    22
+   ]
+  },
+  "maxTickMs": 47.674672999999984,
+  "brainMs": 45170.97502900007,
+  "wallMs": 92303.51193200001,
+  "records": 0,
+  "spec": {
+   "map": "pangaea",
+   "difficulty": "Medium",
+   "bots": 300,
+   "goldMultiplier": 2,
+   "seed": "tune-pangaea-2",
+   "maxTicks": 12000,
+   "policy": "brain",
+   "readoutPath": "/tmp/claude-0/-home-user-OpenFly/db6ee624-d094-51e9-8e4c-359c03825939/scratchpad/work4/readout_r1.json"
+  }
+ },
+ {
+  "seed": "tune-world-1",
+  "map": "world",
+  "ticks": 12000,
+  "alive": true,
+  "landShare": 0.37490403270641004,
+  "peakLandShare": 0.43464490278393436,
+  "rank": 1,
+  "players": 11,
+  "won": false,
+  "winner": null,
+  "decisions": 798,
+  "actionCounts": {
+   "military": [
+    555,
+    11,
+    200,
+    15,
+    13,
+    4
+   ],
+   "economy": [
+    607,
+    57,
+    23,
+    35,
+    17,
+    2,
+    0,
+    57
+   ]
+  },
+  "maxTickMs": 56.568528000003425,
+  "brainMs": 44872.919766999665,
+  "wallMs": 97368.132056,
+  "records": 0,
+  "spec": {
+   "map": "world",
+   "difficulty": "Medium",
+   "bots": 300,
+   "seed": "tune-world-1",
+   "maxTicks": 12000,
+   "policy": "brain",
+   "readoutPath": "/tmp/claude-0/-home-user-OpenFly/db6ee624-d094-51e9-8e4c-359c03825939/scratchpad/work4/readout_r1.json"
+  }
+ },
+ {
+  "seed": "tune-world-2",
+  "map": "world",
+  "ticks": 12000,
+  "alive": true,
+  "landShare": 0.3894040147997763,
+  "peakLandShare": 0.4405770092708358,
+  "rank": 1,
+  "players": 10,
+  "won": false,
+  "winner": null,
+  "decisions": 798,
+  "actionCounts": {
+   "military": [
+    565,
+    9,
+    190,
+    9,
+    11,
+    14
+   ],
+   "economy": [
+    377,
+    170,
+    46,
+    97,
+    5,
+    67,
+    0,
+    36
+   ]
+  },
+  "maxTickMs": 42.281294000000344,
+  "brainMs": 47502.46663000005,
+  "wallMs": 109315.219356,
+  "records": 0,
+  "spec": {
+   "map": "world",
+   "difficulty": "Medium",
+   "bots": 300,
+   "goldMultiplier": 2,
+   "seed": "tune-world-2",
+   "maxTicks": 12000,
+   "policy": "brain",
+   "readoutPath": "/tmp/claude-0/-home-user-OpenFly/db6ee624-d094-51e9-8e4c-359c03825939/scratchpad/work4/readout_r1.json"
+  }
+ },
+ {
+  "seed": "tune-britanniaclassic-1",
+  "map": "britanniaclassic",
+  "ticks": 8899,
+  "alive": false,
+  "landShare": 0,
+  "peakLandShare": 0.1283733550400217,
+  "rank": 13,
+  "players": 13,
+  "won": false,
+  "winner": null,
+  "decisions": 591,
+  "actionCounts": {
+   "military": [
+    468,
+    10,
+    64,
+    47,
+    0,
+    2
+   ],
+   "economy": [
+    491,
+    7,
+    3,
+    5,
+    57,
+    0,
+    0,
+    28
+   ]
+  },
+  "maxTickMs": 43.45970800000214,
+  "brainMs": 28102.598135000022,
+  "wallMs": 62276.157787000004,
+  "records": 0,
+  "spec": {
+   "map": "britanniaclassic",
+   "difficulty": "Medium",
+   "bots": 300,
+   "seed": "tune-britanniaclassic-1",
+   "maxTicks": 12000,
+   "policy": "brain",
+   "readoutPath": "/tmp/claude-0/-home-user-OpenFly/db6ee624-d094-51e9-8e4c-359c03825939/scratchpad/work4/readout_r1.json"
+  }
+ },
+ {
+  "seed": "tune-eastasia-1",
+  "map": "eastasia",
+  "ticks": 7541,
+  "alive": true,
+  "landShare": 0.8006384775541681,
+  "peakLandShare": 0.8006384775541681,
+  "rank": 1,
+  "players": 10,
+  "won": true,
+  "winner": "Fly",
+  "decisions": 501,
+  "actionCounts": {
+   "military": [
+    252,
+    15,
+    217,
+    3,
+    13,
+    1
+   ],
+   "economy": [
+    423,
+    23,
+    8,
+    26,
+    4,
+    2,
+    0,
+    15
+   ]
+  },
+  "maxTickMs": 45.22958899999503,
+  "brainMs": 30557.382924999918,
+  "wallMs": 58467.954251,
+  "records": 0,
+  "spec": {
+   "map": "eastasia",
+   "difficulty": "Medium",
+   "bots": 300,
+   "seed": "tune-eastasia-1",
+   "maxTicks": 12000,
+   "policy": "brain",
+   "readoutPath": "/tmp/claude-0/-home-user-OpenFly/db6ee624-d094-51e9-8e4c-359c03825939/scratchpad/work4/readout_r1.json"
+  }
+ },
+ {
+  "seed": "tune-britanniaclassic-2",
+  "map": "britanniaclassic",
+  "ticks": 12000,
+  "alive": true,
+  "landShare": 0.6013652741853496,
+  "peakLandShare": 0.6875588309079097,
+  "rank": 1,
+  "players": 5,
+  "won": false,
+  "winner": null,
+  "decisions": 798,
+  "actionCounts": {
+   "military": [
+    561,
+    16,
+    180,
+    3,
+    30,
+    8
+   ],
+   "economy": [
+    396,
+    190,
+    72,
+    88,
+    15,
+    23,
+    0,
+    14
+   ]
+  },
+  "maxTickMs": 39.40983099999721,
+  "brainMs": 51538.70758299927,
+  "wallMs": 100974.920675,
+  "records": 0,
+  "spec": {
+   "map": "britanniaclassic",
+   "difficulty": "Medium",
+   "bots": 300,
+   "goldMultiplier": 2,
+   "seed": "tune-britanniaclassic-2",
+   "maxTicks": 12000,
+   "policy": "brain",
+   "readoutPath": "/tmp/claude-0/-home-user-OpenFly/db6ee624-d094-51e9-8e4c-359c03825939/scratchpad/work4/readout_r1.json"
+  }
+ },
+ {
+  "seed": "tune-eastasia-2",
+  "map": "eastasia",
+  "ticks": 12000,
+  "alive": true,
+  "landShare": 0.32254242795970467,
+  "peakLandShare": 0.32254242795970467,
+  "rank": 2,
+  "players": 5,
+  "won": false,
+  "winner": null,
+  "decisions": 798,
+  "actionCounts": {
+   "military": [
+    616,
+    12,
+    112,
+    28,
+    20,
+    10
+   ],
+   "economy": [
+    553,
+    101,
+    39,
+    65,
+    20,
+    9,
+    0,
+    11
+   ]
+  },
+  "maxTickMs": 50.885589000004984,
+  "brainMs": 40683.66897500009,
+  "wallMs": 100128.271028,
+  "records": 0,
+  "spec": {
+   "map": "eastasia",
+   "difficulty": "Medium",
+   "bots": 300,
+   "goldMultiplier": 2,
+   "seed": "tune-eastasia-2",
+   "maxTicks": 12000,
+   "policy": "brain",
+   "readoutPath": "/tmp/claude-0/-home-user-OpenFly/db6ee624-d094-51e9-8e4c-359c03825939/scratchpad/work4/readout_r1.json"
+  }
+ },
+ {
+  "seed": "tune-europe-1",
+  "map": "europe",
+  "ticks": 12000,
+  "alive": true,
+  "landShare": 0.7975788281726017,
+  "peakLandShare": 0.7975788281726017,
+  "rank": 1,
+  "players": 12,
+  "won": false,
+  "winner": null,
+  "decisions": 798,
+  "actionCounts": {
+   "military": [
+    426,
+    22,
+    337,
+    4,
+    8,
+    1
+   ],
+   "economy": [
+    664,
+    21,
+    10,
+    43,
+    7,
+    1,
+    0,
+    52
+   ]
+  },
+  "maxTickMs": 45.45295900000201,
+  "brainMs": 55285.56919999931,
+  "wallMs": 138661.656445,
+  "records": 0,
+  "spec": {
+   "map": "europe",
+   "difficulty": "Medium",
+   "bots": 300,
+   "seed": "tune-europe-1",
+   "maxTicks": 12000,
+   "policy": "brain",
+   "readoutPath": "/tmp/claude-0/-home-user-OpenFly/db6ee624-d094-51e9-8e4c-359c03825939/scratchpad/work4/readout_r1.json"
+  }
+ },
+ {
+  "seed": "tune-africa-1",
+  "map": "africa",
+  "ticks": 10601,
+  "alive": true,
+  "landShare": 0.8105507666049803,
+  "peakLandShare": 0.8105507666049803,
+  "rank": 1,
+  "players": 10,
+  "won": true,
+  "winner": "Fly",
+  "decisions": 705,
+  "actionCounts": {
+   "military": [
+    402,
+    24,
+    272,
+    6,
+    0,
+    1
+   ],
+   "economy": [
+    583,
+    38,
+    4,
+    49,
+    4,
+    4,
+    0,
+    23
+   ]
+  },
+  "maxTickMs": 34.683178999999654,
+  "brainMs": 40326.80582599936,
+  "wallMs": 103995.405705,
+  "records": 0,
+  "spec": {
+   "map": "africa",
+   "difficulty": "Medium",
+   "bots": 300,
+   "seed": "tune-africa-1",
+   "maxTicks": 12000,
+   "policy": "brain",
+   "readoutPath": "/tmp/claude-0/-home-user-OpenFly/db6ee624-d094-51e9-8e4c-359c03825939/scratchpad/work4/readout_r1.json"
+  }
+ },
+ {
+  "seed": "tune-europe-2",
+  "map": "europe",
+  "ticks": 10791,
+  "alive": true,
+  "landShare": 0.802256333164997,
+  "peakLandShare": 0.802256333164997,
+  "rank": 1,
+  "players": 12,
+  "won": true,
+  "winner": "Fly",
+  "decisions": 718,
+  "actionCounts": {
+   "military": [
+    317,
+    20,
+    347,
+    4,
+    0,
+    30
+   ],
+   "economy": [
+    506,
+    46,
+    15,
+    66,
+    50,
+    8,
+    0,
+    27
+   ]
+  },
+  "maxTickMs": 41.9691410000014,
+  "brainMs": 54896.897785999914,
+  "wallMs": 155180.98732,
+  "records": 0,
+  "spec": {
+   "map": "europe",
+   "difficulty": "Medium",
+   "bots": 300,
+   "goldMultiplier": 2,
+   "seed": "tune-europe-2",
+   "maxTicks": 12000,
+   "policy": "brain",
+   "readoutPath": "/tmp/claude-0/-home-user-OpenFly/db6ee624-d094-51e9-8e4c-359c03825939/scratchpad/work4/readout_r1.json"
+  }
+ },
+ {
+  "seed": "tune-africa-2",
+  "map": "africa",
+  "ticks": 12000,
+  "alive": true,
+  "landShare": 0.1417010359766088,
+  "peakLandShare": 0.1417010359766088,
+  "rank": 3,
+  "players": 16,
+  "won": false,
+  "winner": null,
+  "decisions": 798,
+  "actionCounts": {
+   "military": [
+    649,
+    17,
+    83,
+    48,
+    1,
+    0
+   ],
+   "economy": [
+    677,
+    48,
+    16,
+    28,
+    17,
+    4,
+    0,
+    8
+   ]
+  },
+  "maxTickMs": 47.194407999999385,
+  "brainMs": 36078.248362999686,
+  "wallMs": 127894.956177,
+  "records": 0,
+  "spec": {
+   "map": "africa",
+   "difficulty": "Medium",
+   "bots": 300,
+   "goldMultiplier": 2,
+   "seed": "tune-africa-2",
+   "maxTicks": 12000,
+   "policy": "brain",
+   "readoutPath": "/tmp/claude-0/-home-user-OpenFly/db6ee624-d094-51e9-8e4c-359c03825939/scratchpad/work4/readout_r1.json"
+  }
+ }
+]

@@ -1,6 +1,6 @@
 // Evaluate a fly policy over a fixed suite of singleplayer games.
 //   npx tsx ../fly/train/evaluate.ts --policy brain --readout ../brain/readout.json
-//     [--suite quick|standard|heldout] [--out results.json] [--seed-prefix eval]
+//     [--suite quick|standard|heldout|tune|world2x] [--out results.json] [--seed-prefix eval]
 import fs from "node:fs";
 import { Difficulty } from "../../openfront/src/core/game/Game";
 import type { FlyPolicy } from "../game/FlyExecution";
@@ -32,6 +32,23 @@ export function suite(
   prefix: string,
 ): BatchGame[] {
   const games: BatchGame[] = [];
+  if (name === "world2x") {
+    // OpenFront's solo defaults on World with Medium nations and 2x gold,
+    // up to 30 minutes: the setup where the fly used to stall.
+    for (let seed = 0; seed < 6; seed++) {
+      games.push({
+        map: "world",
+        difficulty: Difficulty.Medium,
+        bots: 400,
+        goldMultiplier: 2,
+        seed: `${prefix}-world2x-${seed}`,
+        maxTicks: 18000,
+        policy,
+        readoutPath,
+      });
+    }
+    return games;
+  }
   if (name === "tune") {
     // Medium nations, normal and 2x gold: where the fly used to stall.
     for (const map of ["world", "pangaea", "britanniaclassic", "eastasia", "europe", "africa"]) {
