@@ -1,0 +1,16 @@
+{
+  "name": "openfly",
+  "private": true,
+  "type": "module",
+  "description": "A FlyWire connectome brain that plays OpenFront.io",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "dev": "cd openfront && npm run dev",
+    "fly:play": "cd openfront && npx tsx ../fly/train/play.ts",
+    "fly:probe": "cd openfront && npx tsx ../fly/train/calibrateBrain.ts",
+    "fly:train": "cd openfront && npx tsx ../fly/train/train.ts",
+    "fly:eval": "cd openfront && npx tsx ../fly/train/evaluate.ts",
+    "test": "cd openfront && npx vitest run --config ../fly/vitest.config.ts"
+  }
+}

@@ -1,0 +1,8 @@
+node_modules
+connectome/raw/
+__pycache__/
+*.pyc
+.DS_Store
+# training scratch (records are large; results summaries are kept in train/results)
+work/
+*.cpuprofile

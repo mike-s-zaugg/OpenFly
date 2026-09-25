@@ -1,0 +1,312 @@
+diff --git a/resources/lang/en.json b/resources/lang/en.json
+index a06cb5f..5de29a0 100644
+--- a/resources/lang/en.json
++++ b/resources/lang/en.json
+@@ -1862,6 +1862,8 @@
+     "max_timer_invalid": "Please enter a valid max timer value (1-120 minutes)",
+     "medals_earned": "Medals",
+     "medals_of_maps": "out of {total} maps",
++    "openfly_spectate": "🪰 Let the fly play",
++    "openfly_spectate_hint": "A FlyWire connectome brain plays this game in your slot while you watch its neurons fire",
+     "options_changed_no_achievements": "Custom settings – achievements disabled",
+     "sign_in_for_achievements": "Sign in for achievements",
+     "toggle_achievements": "Toggle achievements"
+diff --git a/src/client/ClientGameRunner.ts b/src/client/ClientGameRunner.ts
+index cc2a967..966367a 100644
+--- a/src/client/ClientGameRunner.ts
++++ b/src/client/ClientGameRunner.ts
+@@ -91,6 +91,7 @@ import { audioMixer, initAudioMixer } from "./sound/AudioMixer";
+ import { SoundManager } from "./sound/SoundManager";
+ import { themeProvider } from "./theme/ThemeProvider";
+ import { GameView, PlayerView } from "./view";
++import { openflyMountClient } from "../../../fly/integration/client";
+ 
+ export interface LobbyConfig {
+   cosmetics: PlayerCosmeticRefs;
+@@ -921,6 +922,7 @@ export class ClientGameRunner {
+ 
+   private lastTickReceiveTime: number = 0;
+   private currentTickDelay: number | undefined = undefined;
++  private openflyCleanup: (() => void) | null = null;
+ 
+   constructor(
+     private lobby: LobbyConfig,
+@@ -963,6 +965,7 @@ export class ClientGameRunner {
+     this.isActive = true;
+     this.lastMessageTime = Date.now();
+     this.metrics?.start();
++    this.openflyCleanup = openflyMountClient(this.lobby.gameStartInfo);
+     setTimeout(() => {
+       this.connectionCheckInterval = setInterval(
+         () => this.onConnectionCheck(),
+@@ -1175,6 +1178,8 @@ export class ClientGameRunner {
+   }
+ 
+   public stop() {
++    this.openflyCleanup?.();
++    this.openflyCleanup = null;
+     this.soundManager.dispose();
+     this.graphicsListenerAbort?.abort();
+     // Detach the input handler's window/canvas listeners and its EventBus
+diff --git a/src/client/LocalServer.ts b/src/client/LocalServer.ts
+index f4e94d6..3bf9298 100644
+--- a/src/client/LocalServer.ts
++++ b/src/client/LocalServer.ts
+@@ -200,6 +200,10 @@ export class LocalServer {
+       if (this.lobbyConfig.gameRecord || this.paused) {
+         return;
+       }
++      // OpenFly spectate: the fly owns this player; the human only watches.
++      if (this.lobbyConfig.gameStartInfo?.config.openfly?.mode === "spectate") {
++        return;
++      }
+ 
+       this.intents.push(stampedIntent);
+     }
+@@ -299,6 +303,10 @@ export class LocalServer {
+     if (this.archived || this.archiveInFlight) {
+       return;
+     }
++    // OpenFly games are played by connectome brains, not by this account.
++    if (this.lobbyConfig.gameStartInfo?.config.openfly !== undefined) {
++      return;
++    }
+     const players: PlayerRecord[] = [
+       {
+         persistentID: getPersistentID(),
+diff --git a/src/client/SinglePlayerModal.ts b/src/client/SinglePlayerModal.ts
+index 3fba34d..83b76e9 100644
+--- a/src/client/SinglePlayerModal.ts
++++ b/src/client/SinglePlayerModal.ts
+@@ -214,6 +214,8 @@ export class SinglePlayerModal extends BaseModal {
+   // nothing visible until every await in startGame() settles, which reads as
+   // a hang rather than as loading whenever the network is slow or absent.
+   @state() private starting: boolean = false;
++  // OpenFly: the next start hands the player slot to a fly brain.
++  private flySpectate = false;
+   // Identifies the current start attempt. Bumped on every start and on every
+   // close, so an attempt that outlives its modal can tell it has been retired.
+   private startAttempt: number = 0;
+@@ -588,6 +590,15 @@ export class SinglePlayerModal extends BaseModal {
+             .disable=${this.starting}
+             @click=${this.startGame}
+           ></o-button>
++          <o-button
++            class="block mt-3"
++            variant="secondary"
++            width="block"
++            translationKey="single_modal.openfly_spectate"
++            title=${translateText("single_modal.openfly_spectate_hint")}
++            .disable=${this.starting}
++            @click=${this.startFlyGame}
++          ></o-button>
+         </div>
+       </div>
+     `;
+@@ -1035,10 +1046,20 @@ export class SinglePlayerModal extends BaseModal {
+     );
+   }
+ 
++  private startFlyGame = async () => {
++    this.flySpectate = true;
++    try {
++      await this.startGame();
++    } finally {
++      this.flySpectate = false;
++    }
++  };
++
+   private async startGame() {
+     // A second click while the first is still resolving would dispatch a
+     // second join-lobby for a different gameID.
+     if (this.starting) return;
++    const flySpectate = this.flySpectate;
+     // Validate and clamp maxTimer setting before starting
+     let finalMaxTimerValue: number | undefined = undefined;
+     if (this.maxTimer) {
+@@ -1125,8 +1146,10 @@ export class SinglePlayerModal extends BaseModal {
+               players: [
+                 {
+                   clientID,
+-                  username: resolvedName.name,
+-                  clanTag: usernameInput?.getClanTag() ?? null,
++                  username: flySpectate ? "Fly" : resolvedName.name,
++                  clanTag: flySpectate
++                    ? null
++                    : (usernameInput?.getClanTag() ?? null),
+                   cosmetics,
+                 },
+               ],
+@@ -1169,6 +1192,9 @@ export class SinglePlayerModal extends BaseModal {
+                   ? { customAllianceDuration: this.customAllianceMinutes ?? 0 }
+                   : {}),
+                 ...(this.waterNukes ? { waterNukes: true } : {}),
++                ...(flySpectate
++                  ? { openfly: { mode: "spectate" as const } }
++                  : {}),
+                 ...(this.doomsdayClock
+                   ? {
+                       doomsdayClock: {
+diff --git a/src/core/GameRunner.ts b/src/core/GameRunner.ts
+index 4d21ff1..74e658f 100644
+--- a/src/core/GameRunner.ts
++++ b/src/core/GameRunner.ts
+@@ -36,6 +36,10 @@ import {
+   snapshotGame,
+ } from "./snapshot/GameSnapshot";
+ import { simpleHash } from "./Util";
++import {
++  openflyExtraExecutions,
++  openflyNationExecutions,
++} from "../../../fly/integration/core";
+ 
+ export async function createGameRunner(
+   gameStart: GameStartInfo,
+@@ -172,8 +176,15 @@ export class GameRunner {
+       this.game.addExecution(new SpawnTimerExecution());
+     }
+     if (this.game.config().spawnNations()) {
+-      this.game.addExecution(...this.execManager.nationExecutions());
++      this.game.addExecution(
++        ...openflyNationExecutions(this.game, this.execManager.gameID(), () =>
++          this.execManager.nationExecutions(),
++        ),
++      );
+     }
++    this.game.addExecution(
++      ...openflyExtraExecutions(this.game, this.execManager.gameID()),
++    );
+     if (this.game.config().isRandomSpawn()) {
+       this.game.addExecution(...this.execManager.spawnPlayers());
+     }
+diff --git a/src/core/Schemas.ts b/src/core/Schemas.ts
+index 12bef00..212401c 100644
+--- a/src/core/Schemas.ts
++++ b/src/core/Schemas.ts
+@@ -575,6 +575,16 @@ export const GameConfigSchema = z.object({
+       startingGold: zb.uint({ max: 1000000000 }).nullable().optional(),
+     })
+     .optional(),
++  // OpenFly: players driven by a FlyWire connectome brain (see ../fly).
++  // spectate: the fly plays the local human's slot while the human watches.
++  // versus: up to maxFlies nations get fly brains instead of the nation AI.
++  openfly: z
++    .object({
++      mode: z.enum(["spectate", "versus"]),
++      policy: z.enum(["brain", "teacher"]).optional(),
++      maxFlies: zb.uint({ max: 400 }).optional(),
++    })
++    .optional(),
+ });
+ 
+ export const TeamSchema = z.string();
+diff --git a/src/core/snapshot/ExecutionRegistry.ts b/src/core/snapshot/ExecutionRegistry.ts
+index aab89b2..29fba35 100644
+--- a/src/core/snapshot/ExecutionRegistry.ts
++++ b/src/core/snapshot/ExecutionRegistry.ts
+@@ -43,6 +43,7 @@ import { TribeExecutionSnapshot } from "../execution/TribeExecution";
+ import { UpgradeStructureExecutionSnapshot } from "../execution/UpgradeStructureExecution";
+ import { WarshipExecutionSnapshot } from "../execution/WarshipExecution";
+ import { WinCheckExecutionSnapshot } from "../execution/WinCheckExecution";
++import { FlyExecutionSnapshot } from "../../../../fly/game/FlyExecution";
+ import type { ExecutionSnapshotType } from "./ExecutionSnapshot";
+ 
+ /**
+@@ -97,4 +98,5 @@ export const EXECUTION_SNAPSHOT_TYPES = [
+   UpgradeStructureExecutionSnapshot,
+   WarshipExecutionSnapshot,
+   WinCheckExecutionSnapshot,
++  FlyExecutionSnapshot,
+ ] as unknown as readonly ExecutionSnapshotType<unknown>[];
+diff --git a/src/core/worker/Worker.worker.ts b/src/core/worker/Worker.worker.ts
+index fb3471c..73cd310 100644
+--- a/src/core/worker/Worker.worker.ts
++++ b/src/core/worker/Worker.worker.ts
+@@ -6,6 +6,7 @@ import {
+   createGameRunnerFromSnapshot,
+   GameRunner,
+ } from "../GameRunner";
++import { openflyPrepareWorker } from "../../../../fly/integration/worker";
+ import {
+   AttackClusteredPositionsResultMessage,
+   InitializedMessage,
+@@ -152,7 +153,9 @@ ctx.addEventListener("message", async (e: MessageEvent<MainThreadMessage>) => {
+         // Set before createGameRunner so map fetches via mapLoader pick up the
+         // CDN base. Workers have no `window`, so AssetUrls falls back to this.
+         globalThis.__CDN_BASE__ = message.cdnBase;
+-        gameRunner = (
++        gameRunner = openflyPrepareWorker(message.gameStartInfo, (m, t) =>
++          ctx.postMessage(m, t),
++        ).then(() =>
+           message.snapshot !== undefined
+             ? createGameRunnerFromSnapshot(
+                 message.gameStartInfo,
+@@ -166,7 +169,7 @@ ctx.addEventListener("message", async (e: MessageEvent<MainThreadMessage>) => {
+                 message.clientID,
+                 mapLoader,
+                 gameUpdate,
+-              )
++              ),
+         ).then((gr) => {
+           sendMessage({
+             type: "initialized",
+diff --git a/src/core/worker/WorkerClient.ts b/src/core/worker/WorkerClient.ts
+index ff4b4b6..143e2dd 100644
+--- a/src/core/worker/WorkerClient.ts
++++ b/src/core/worker/WorkerClient.ts
+@@ -12,6 +12,10 @@ import { TileRef } from "../game/GameMap";
+ import { ErrorUpdate, GameUpdateViewData } from "../game/GameUpdates";
+ import { ClientID, GameStartInfo, Turn } from "../Schemas";
+ import { generateID } from "../Util";
++import {
++  dispatchOpenflyTelemetry,
++  isOpenflyTelemetry,
++} from "../../../../fly/integration/events";
+ import { WorkerMessage } from "./WorkerMessages";
+ 
+ // Inlined as a same-origin Blob (Vite's `?worker&inline`), sidestepping the
+@@ -44,6 +48,10 @@ export class WorkerClient {
+ 
+   private handleWorkerMessage(event: MessageEvent<WorkerMessage>) {
+     const message = event.data;
++    if (isOpenflyTelemetry(message)) {
++      dispatchOpenflyTelemetry(message);
++      return;
++    }
+ 
+     switch (message.type) {
+       case "game_update":
+diff --git a/tests/core/snapshot/FullGameSnapshot.test.ts b/tests/core/snapshot/FullGameSnapshot.test.ts
+index 5be5b54..5e30253 100644
+--- a/tests/core/snapshot/FullGameSnapshot.test.ts
++++ b/tests/core/snapshot/FullGameSnapshot.test.ts
+@@ -166,6 +166,9 @@ describe.each(VARIANTS)("full game snapshots: %s", (_, overrides) => {
+       // Runs during the spawn phase and finishes inside init, so it is never
+       // alive at a tick boundary. BasicExecutions.test.ts covers it directly.
+       const neverStored = new Set(["Pause"]);
++      // OpenFly's fly brains only run in OpenFly games; their snapshot
++      // round trip is tested in the OpenFly repo (fly/tests).
++      neverStored.add("OpenFly");
+       const missing = EXECUTION_SNAPSHOT_TYPES.map((t) => t.name).filter(
+         (name) => !reference.execTypes.has(name) && !neverStored.has(name),
+       );
+diff --git a/vite.config.ts b/vite.config.ts
+index a086e5c..9c8fb8b 100644
+--- a/vite.config.ts
++++ b/vite.config.ts
+@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
+ import { defineConfig, loadEnv, type Plugin } from "vite";
+ import { createHtmlPlugin } from "vite-plugin-html";
+ import { configDefaults } from "vitest/config";
++import { openflyPlugin } from "../fly/integration/vitePlugin";
+ import {
+   type AssetManifest,
+   buildAssetUrl,
+@@ -383,6 +384,7 @@ export default defineConfig(({ mode }) => {
+         ? [injectCdnBaseTemplate(), syncHashedPublicAssets()]
+         : []),
+       tailwindcss(),
++      openflyPlugin(),
+     ],
+ 
+     define: {
